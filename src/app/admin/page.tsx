@@ -3,14 +3,15 @@
 import { useState, useEffect } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { supabase } from "@/lib/supabase";
-import { PlusCircle, List, Pencil, Trash2, Search } from "lucide-react";
+import { PlusCircle, List, Pencil, Trash2, Search, Brain, BookOpen, Upload, Link as LinkIcon, FileText, Settings, Play, Save, X, Check, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"add" | "manage">("add");
+  const [activeTab, setActiveTab] = useState<"add" | "manage" | "subjects" | "generator">("add");
   const [questions, setQuestions] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [editingQuestion, setEditingQuestion] = useState<any>(null);
 
   // Form State
   const [subject, setSubject] = useState("Polity");
@@ -25,11 +26,68 @@ export default function AdminPage() {
   const [correctOption, setCorrectOption] = useState("A");
   const [explanation, setExplanation] = useState("");
 
+  // Advanced Form Fields
+  const [optionAExplanation, setOptionAExplanation] = useState("");
+  const [optionBExplanation, setOptionBExplanation] = useState("");
+  const [optionCExplanation, setOptionCExplanation] = useState("");
+  const [optionDExplanation, setOptionDExplanation] = useState("");
+  const [eliminationTip, setEliminationTip] = useState("");
+  const [memoryTrick, setMemoryTrick] = useState("");
+  const [staticTopicLink, setStaticTopicLink] = useState("");
+  const [relatedCurrentAffairs, setRelatedCurrentAffairs] = useState("");
+  const [estimatedSolvingTime, setEstimatedSolvingTime] = useState(60);
+  const [revisionPriority, setRevisionPriority] = useState("normal");
+  const [source, setSource] = useState("original");
+  const [tags, setTags] = useState("");
+
+  // Subjects & Topics State
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [topics, setTopics] = useState<any[]>([]);
+  const [newSubName, setNewSubName] = useState("");
+  const [newSubColor, setNewSubColor] = useState("#6366f1");
+  const [newSubIcon, setNewSubIcon] = useState("📚");
+  const [addingTopicTo, setAddingTopicTo] = useState<string | null>(null);
+  const [newTopicName, setNewTopicName] = useState("");
+
+  // AI Generator State
+  const [aiInputMode, setAiInputMode] = useState<"text" | "pdf" | "url" | "notes" | "manual">("text");
+  const [aiSourceText, setAiSourceText] = useState("");
+  const [aiPdfFile, setAiPdfFile] = useState<File | null>(null);
+  const [aiUrl, setAiUrl] = useState("");
+  const [aiExtracting, setAiExtracting] = useState(false);
+  const [aiExtractedContext, setAiExtractedContext] = useState("");
+  
+  const [aiConfig, setAiConfig] = useState({
+    count: 5,
+    difficulty: "Mixed",
+    upscLevel: "Prelims",
+    subject: "Current Affairs",
+    topic: "",
+    language: "English",
+    explanationLength: "Medium",
+    includeEliminationTips: true,
+    autoGenerateTags: true,
+    source: "Current Affairs"
+  });
+  
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState<any[]>([]);
+  const [aiSaveStats, setAiSaveStats] = useState<any>(null);
+
   useEffect(() => {
     if (activeTab === "manage") {
       fetchQuestions();
+    } else if (activeTab === "subjects" || activeTab === "generator") {
+      fetchSubjects();
     }
   }, [activeTab]);
+
+  const fetchSubjects = async () => {
+    const { data: s } = await supabase.from("subjects").select("*").order("name");
+    const { data: t } = await supabase.from("topics").select("*").order("name");
+    if (s) setSubjects(s);
+    if (t) setTopics(t);
+  };
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -47,7 +105,7 @@ export default function AdminPage() {
     setLoading(true);
     setMessage("");
 
-    const newQuestion = {
+    const questionData = {
       subject,
       topic,
       difficulty,
@@ -58,15 +116,39 @@ export default function AdminPage() {
       option_c: optionC,
       option_d: optionD,
       correct_option: correctOption,
-      explanation
+      explanation,
+      option_a_explanation: correctOption !== 'A' ? optionAExplanation : null,
+      option_b_explanation: correctOption !== 'B' ? optionBExplanation : null,
+      option_c_explanation: correctOption !== 'C' ? optionCExplanation : null,
+      option_d_explanation: correctOption !== 'D' ? optionDExplanation : null,
+      elimination_tip: eliminationTip,
+      memory_trick: memoryTrick,
+      static_topic_link: staticTopicLink,
+      related_current_affairs: relatedCurrentAffairs,
+      estimated_solving_time: estimatedSolvingTime,
+      revision_priority: revisionPriority,
+      source,
+      year: source === 'PYQ' ? year : null,
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean)
     };
 
-    const { error } = await supabase.from("questions").insert(newQuestion);
+    let error;
+    if (editingQuestion) {
+      const { error: updateError } = await supabase.from("questions").update(questionData).eq("id", editingQuestion.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase.from("questions").insert(questionData);
+      error = insertError;
+    }
 
     if (error) {
       setMessage(`Error: ${error.message}`);
     } else {
-      setMessage("Question added successfully!");
+      setMessage(editingQuestion ? "Question updated successfully!" : "Question added successfully!");
+      if (editingQuestion) {
+        setEditingQuestion(null);
+        fetchQuestions();
+      }
       // Reset form
       setTopic("");
       setQuestionText("");
@@ -75,8 +157,39 @@ export default function AdminPage() {
       setOptionC("");
       setOptionD("");
       setExplanation("");
+      setOptionAExplanation("");
+      setOptionBExplanation("");
+      setOptionCExplanation("");
+      setOptionDExplanation("");
+      setEliminationTip("");
+      setMemoryTrick("");
+      setStaticTopicLink("");
+      setRelatedCurrentAffairs("");
+      setTags("");
     }
     setLoading(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingQuestion(null);
+    setActiveTab("manage");
+    setMessage("");
+    setTopic("");
+    setQuestionText("");
+    setOptionA("");
+    setOptionB("");
+    setOptionC("");
+    setOptionD("");
+    setExplanation("");
+    setOptionAExplanation("");
+    setOptionBExplanation("");
+    setOptionCExplanation("");
+    setOptionDExplanation("");
+    setEliminationTip("");
+    setMemoryTrick("");
+    setStaticTopicLink("");
+    setRelatedCurrentAffairs("");
+    setTags("");
   };
 
   const handleDelete = async (id: string) => {
@@ -84,6 +197,104 @@ export default function AdminPage() {
       await supabase.from("questions").delete().eq("id", id);
       fetchQuestions();
     }
+  };
+
+  // --- Subjects Handlers ---
+  const handleAddSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const slug = newSubName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    await supabase.from("subjects").insert({ name: newSubName, slug, color: newSubColor, icon: newSubIcon });
+    setNewSubName("");
+    fetchSubjects();
+  };
+
+  const handleAddTopic = async (subId: string) => {
+    if(!newTopicName.trim()) return;
+    const slug = newTopicName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    await supabase.from("topics").insert({ name: newTopicName, slug, subject_id: subId });
+    setNewTopicName("");
+    setAddingTopicTo(null);
+    fetchSubjects();
+  };
+
+  const handleDeleteTopic = async (id: string) => {
+    await supabase.from("topics").delete().eq("id", id);
+    fetchSubjects();
+  };
+
+  // --- AI Handlers ---
+  const handleExtractContext = async () => {
+    setAiExtracting(true);
+    try {
+      if (aiInputMode === 'text' || aiInputMode === 'notes') {
+        setAiExtractedContext(aiSourceText);
+      } else if (aiInputMode === 'manual') {
+        setAiExtractedContext(`Generate questions for Subject: ${aiConfig.subject}, Topic: ${aiConfig.topic}`);
+      } else {
+        const formData = new FormData();
+        formData.append("type", aiInputMode);
+        if (aiInputMode === 'url') formData.append("url", aiUrl);
+        if (aiInputMode === 'pdf' && aiPdfFile) formData.append("file", aiPdfFile);
+
+        const res = await fetch("/api/extract", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setAiExtractedContext(data.text);
+      }
+    } catch (e: any) {
+      alert("Extraction failed: " + e.message);
+    }
+    setAiExtracting(false);
+  };
+
+  const handleGenerateQuestions = async () => {
+    if (!aiExtractedContext.trim()) return alert("No context to generate from.");
+    setAiGenerating(true);
+    setAiSaveStats(null);
+    try {
+      const res = await fetch("/api/generate-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: aiExtractedContext, config: aiConfig })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setAiGeneratedQuestions(data.data);
+    } catch (e: any) {
+      alert("Generation failed: " + e.message);
+    }
+    setAiGenerating(false);
+  };
+
+  const handleBulkSave = async () => {
+    let saved = 0, skipped = 0, failed = 0;
+    const { data: existing } = await supabase.from("questions").select("question_text");
+    const existingTexts = new Set(existing?.map(q => q.question_text) || []);
+
+    for (const q of aiGeneratedQuestions) {
+      if (existingTexts.has(q.question_text)) {
+        skipped++;
+        continue;
+      }
+      
+      const toInsert = {
+        ...q,
+        option_a_explanation: q.why_a_wrong,
+        option_b_explanation: q.why_b_wrong,
+        option_c_explanation: q.why_c_wrong,
+        option_d_explanation: q.why_d_wrong,
+      };
+      delete toInsert.why_a_wrong;
+      delete toInsert.why_b_wrong;
+      delete toInsert.why_c_wrong;
+      delete toInsert.why_d_wrong;
+
+      const { error } = await supabase.from("questions").insert(toInsert);
+      if (error) failed++; else saved++;
+    }
+
+    setAiSaveStats({ saved, skipped, failed, total: aiGeneratedQuestions.length });
+    if (saved > 0) setAiGeneratedQuestions([]);
   };
 
   const filteredQuestions = questions.filter(q => 
@@ -97,36 +308,29 @@ export default function AdminPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-white mb-8">Admin Dashboard</h1>
 
-        {/* Tabs */}
-        <div className="flex space-x-1 bg-white/5 p-1 rounded-lg w-fit mb-8 border border-white/10">
-          <button
-            onClick={() => setActiveTab("add")}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
-              activeTab === "add" 
-                ? "bg-primary text-primary-foreground shadow-sm" 
-                : "text-gray-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <PlusCircle className="h-4 w-4" />
-            Add Question
-          </button>
-          <button
-            onClick={() => setActiveTab("manage")}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
-              activeTab === "manage" 
-                ? "bg-primary text-primary-foreground shadow-sm" 
-                : "text-gray-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <List className="h-4 w-4" />
-            Manage Questions
-          </button>
+        <div className="flex flex-wrap gap-2 bg-white/5 p-1 rounded-lg w-fit mb-8 border border-white/10">
+          {[
+            { id: "add", label: "Add Question", icon: PlusCircle },
+            { id: "manage", label: "Manage Questions", icon: List },
+            { id: "subjects", label: "Subjects & Topics", icon: BookOpen },
+            { id: "generator", label: "AI Question Studio", icon: Brain },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id as any)}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
+                activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-gray-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <t.icon className="h-4 w-4" /> {t.label}
+            </button>
+          ))}
         </div>
 
         {/* Add Question Tab */}
         {activeTab === "add" && (
           <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
-            <h2 className="text-xl font-semibold text-white mb-6">Add New MCQ</h2>
+            <h2 className="text-xl font-semibold text-white mb-6">{editingQuestion ? "Edit MCQ" : "Add New MCQ"}</h2>
             
             {message && (
               <div className={`p-4 rounded-lg mb-6 text-sm ${message.includes("Error") ? "bg-destructive/20 border border-destructive text-destructive-foreground" : "bg-green-500/20 border border-green-500 text-green-400"}`}>
@@ -171,15 +375,7 @@ export default function AdminPage() {
                     <option value="Hard">Hard</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Year (if PYQ)</label>
-                  <input 
-                    type="number" 
-                    value={year} 
-                    onChange={e => setYear(Number(e.target.value))}
-                    className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
+
               </div>
 
               <div>
@@ -232,7 +428,7 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Explanation</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Explanation (Correct Answer)</label>
                 <textarea 
                   value={explanation} 
                   onChange={e => setExplanation(e.target.value)}
@@ -241,13 +437,115 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div className="flex justify-end pt-4">
+              <details className="group border border-white/10 bg-white/5 rounded-xl p-4 transition-all" open>
+                <summary className="text-sm font-semibold text-white cursor-pointer outline-none list-none flex items-center justify-between">
+                  Advanced Explanation Fields (What makes Prepwise different)
+                  <span className="group-open:rotate-180 transition-transform"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg></span>
+                </summary>
+                
+                <div className="mt-6 space-y-6">
+                  {/* Why Wrong Explanations */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {correctOption !== 'A' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Why Option A is wrong</label>
+                        <textarea value={optionAExplanation} onChange={e => setOptionAExplanation(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px]" placeholder="Explain why A misleads students..." />
+                      </div>
+                    )}
+                    {correctOption !== 'B' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Why Option B is wrong</label>
+                        <textarea value={optionBExplanation} onChange={e => setOptionBExplanation(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px]" placeholder="Explain why B misleads students..." />
+                      </div>
+                    )}
+                    {correctOption !== 'C' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Why Option C is wrong</label>
+                        <textarea value={optionCExplanation} onChange={e => setOptionCExplanation(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px]" placeholder="Explain why C misleads students..." />
+                      </div>
+                    )}
+                    {correctOption !== 'D' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Why Option D is wrong</label>
+                        <textarea value={optionDExplanation} onChange={e => setOptionDExplanation(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px]" placeholder="Explain why D misleads students..." />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">UPSC Elimination Tip</label>
+                      <textarea value={eliminationTip} onChange={e => setEliminationTip(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px]" placeholder="What UPSC-specific logic helps eliminate wrong options?" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Memory Trick (Mnemonic)</label>
+                      <textarea value={memoryTrick} onChange={e => setMemoryTrick(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px]" placeholder="e.g. BHAJSA for Mughal emperors..." />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Static Syllabus Connection</label>
+                      <input type="text" value={staticTopicLink} onChange={e => setStaticTopicLink(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="e.g. Polity → Article 32" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Related Current Affairs</label>
+                      <input type="text" value={relatedCurrentAffairs} onChange={e => setRelatedCurrentAffairs(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="e.g. Recent Supreme Court verdict on..." />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Source</label>
+                      <select value={source} onChange={e => setSource(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="original">Original</option>
+                        <option value="PYQ">PYQ (Previous Year Question)</option>
+                        <option value="current_affairs">Current Affairs</option>
+                      </select>
+                    </div>
+                    {source === "PYQ" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Year</label>
+                        <input type="number" value={year} onChange={e => setYear(Number(e.target.value))} className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Revision Priority</label>
+                      <select value={revisionPriority} onChange={e => setRevisionPriority(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Estimated Time (sec)</label>
+                      <input type="number" value={estimatedSolvingTime} onChange={e => setEstimatedSolvingTime(Number(e.target.value))} className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Tags (Comma-separated)</label>
+                    <input type="text" value={tags} onChange={e => setTags(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="e.g. budget, RBI, monetary policy" />
+                  </div>
+                </div>
+              </details>
+
+              <div className="flex justify-end pt-4 space-x-4">
+                {editingQuestion && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="bg-white/10 text-white font-semibold py-2.5 px-8 rounded-lg hover:bg-white/20 transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={loading}
                   className="bg-primary text-primary-foreground font-semibold py-2.5 px-8 rounded-lg hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(255,191,0,0.3)] hover:shadow-[0_0_25px_rgba(255,191,0,0.5)] disabled:opacity-70"
                 >
-                  {loading ? "Saving..." : "Save Question"}
+                  {loading ? "Saving..." : editingQuestion ? "Update Question" : "Save Question"}
                 </button>
               </div>
             </form>
@@ -310,7 +608,36 @@ export default function AdminPage() {
                         </td>
                         <td className="py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors">
+                            <button 
+                              onClick={() => {
+                                setEditingQuestion(q);
+                                setSubject(q.subject || "Polity");
+                                setTopic(q.topic || "");
+                                setDifficulty(q.difficulty || "Medium");
+                                setYear(q.year || new Date().getFullYear());
+                                setQuestionText(q.question_text || "");
+                                setOptionA(q.option_a || "");
+                                setOptionB(q.option_b || "");
+                                setOptionC(q.option_c || "");
+                                setOptionD(q.option_d || "");
+                                setCorrectOption(q.correct_option || "A");
+                                setExplanation(q.explanation || "");
+                                setOptionAExplanation(q.option_a_explanation || "");
+                                setOptionBExplanation(q.option_b_explanation || "");
+                                setOptionCExplanation(q.option_c_explanation || "");
+                                setOptionDExplanation(q.option_d_explanation || "");
+                                setEliminationTip(q.elimination_tip || "");
+                                setMemoryTrick(q.memory_trick || "");
+                                setStaticTopicLink(q.static_topic_link || "");
+                                setRelatedCurrentAffairs(q.related_current_affairs || "");
+                                setEstimatedSolvingTime(q.estimated_solving_time || 60);
+                                setRevisionPriority(q.revision_priority || "normal");
+                                setSource(q.source || "original");
+                                setTags(q.tags ? q.tags.join(", ") : "");
+                                setActiveTab("add");
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                            >
                               <Pencil className="h-4 w-4" />
                             </button>
                             <button 
@@ -327,6 +654,162 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+      </div>
+      
+        {/* ================= SUBJECTS & TOPICS ================= */}
+        {activeTab === "subjects" && (
+          <div className="space-y-8">
+            <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
+              <h2 className="text-xl font-semibold text-white mb-6">Add New Subject</h2>
+              <form onSubmit={handleAddSubject} className="flex gap-4">
+                <input type="text" value={newSubName} onChange={e=>setNewSubName(e.target.value)} placeholder="Subject Name" required className="flex-1 bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white" />
+                <input type="color" value={newSubColor} onChange={e=>setNewSubColor(e.target.value)} className="w-12 h-12 p-1 rounded-lg bg-background border border-white/10 cursor-pointer" />
+                <input type="text" value={newSubIcon} onChange={e=>setNewSubIcon(e.target.value)} placeholder="Emoji (e.g. 📚)" required className="w-24 text-center bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white" />
+                <button type="submit" className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-bold">Add Subject</button>
+              </form>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {subjects.map(s => (
+                <div key={s.id} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl">{s.icon}</span>
+                    <h3 className="text-lg font-bold text-white" style={{color: s.color}}>{s.name}</h3>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    {topics.filter(t => t.subject_id === s.id).map(t => (
+                      <div key={t.id} className="flex justify-between items-center bg-white/5 p-2 rounded-md">
+                        <span className="text-sm text-gray-300">{t.name}</span>
+                        <button onClick={() => handleDeleteTopic(t.id)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {addingTopicTo === s.id ? (
+                    <div className="flex gap-2">
+                      <input type="text" autoFocus value={newTopicName} onChange={e=>setNewTopicName(e.target.value)} className="flex-1 bg-background border border-white/10 rounded-md py-1.5 px-3 text-sm text-white" placeholder="Topic name..." />
+                      <button onClick={() => handleAddTopic(s.id)} className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-md text-sm">Save</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setAddingTopicTo(s.id); setNewTopicName(""); }} className="text-sm text-primary hover:underline flex items-center gap-1">+ Add Topic</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ================= AI QUESTION STUDIO ================= */}
+        {activeTab === "generator" && (
+          <div className="space-y-8">
+            <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
+              <h2 className="text-xl font-semibold text-white mb-6">AI Question Studio: Content Importer</h2>
+              
+              <div className="flex flex-wrap gap-2 mb-6">
+                {[
+                  { id: "text", label: "Paste Article" },
+                  { id: "pdf", label: "Upload PDF" },
+                  { id: "url", label: "Website URL" },
+                  { id: "notes", label: "Paste Raw Notes" },
+                  { id: "manual", label: "Manual Topic" },
+                ].map(m => (
+                  <button key={m.id} onClick={() => setAiInputMode(m.id as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${aiInputMode === m.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white hover:bg-white/10'}`}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {aiInputMode === "text" || aiInputMode === "notes" ? (
+                <textarea value={aiSourceText} onChange={e => setAiSourceText(e.target.value)} className="w-full h-40 bg-background border border-white/10 rounded-lg p-4 text-white" placeholder="Paste your text or notes here..." />
+              ) : aiInputMode === "url" ? (
+                <input type="url" value={aiUrl} onChange={e => setAiUrl(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" placeholder="https://example.com/article" />
+              ) : aiInputMode === "pdf" ? (
+                <input type="file" accept=".pdf" onChange={e => setAiPdfFile(e.target[0] || null)} className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" />
+              ) : (
+                <div className="p-4 border border-dashed border-white/10 rounded-lg text-center text-gray-400">Manual generation will rely entirely on the Subject and Topic configured below.</div>
+              )}
+
+              <div className="mt-4 flex justify-end">
+                <button onClick={handleExtractContext} disabled={aiExtracting} className="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2">
+                  {aiExtracting ? "Extracting..." : "Step 1: Extract & Preview Content"}
+                </button>
+              </div>
+            </div>
+
+            {aiExtractedContext !== "" && (
+              <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
+                <h3 className="text-lg font-semibold text-white mb-4">Step 2: Refine Context & Configure AI</h3>
+                <textarea value={aiExtractedContext} onChange={e => setAiExtractedContext(e.target.value)} className="w-full h-48 bg-background border border-white/10 rounded-lg p-4 text-gray-300 text-sm mb-6 font-mono" />
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div><label className="block text-xs text-gray-400 mb-1">Questions</label><select value={aiConfig.count} onChange={e=>setAiConfig({...aiConfig, count: Number(e.target.value)})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm"><option value="5">5</option><option value="10">10</option><option value="15">15</option></select></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Difficulty</label><select value={aiConfig.difficulty} onChange={e=>setAiConfig({...aiConfig, difficulty: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm"><option>Mixed</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Subject</label><input type="text" value={aiConfig.subject} onChange={e=>setAiConfig({...aiConfig, subject: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Topic</label><input type="text" value={aiConfig.topic} onChange={e=>setAiConfig({...aiConfig, topic: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm" /></div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button onClick={handleGenerateQuestions} disabled={aiGenerating} className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-semibold flex items-center gap-2">
+                    <Brain className="w-4 h-4" /> {aiGenerating ? "Generating MCQs (this takes time)..." : "Step 3: Generate MCQs"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {aiSaveStats && (
+              <div className="bg-green-500/20 border border-green-500/50 p-4 rounded-xl flex items-center gap-4 text-green-400">
+                <CheckCircle2 className="w-6 h-6" />
+                <div>
+                  <p className="font-bold">Save Complete</p>
+                  <p className="text-sm">Total Generated: {aiSaveStats.total} | Saved: {aiSaveStats.saved} | Skipped (Duplicates): {aiSaveStats.skipped} | Failed: {aiSaveStats.failed}</p>
+                </div>
+              </div>
+            )}
+
+            {aiGeneratedQuestions.length > 0 && (
+              <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-semibold text-white">Step 4: Editable Preview</h3>
+                  <button onClick={handleBulkSave} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2">
+                    <Save className="w-4 h-4" /> Save All to Database
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {aiGeneratedQuestions.map((q, idx) => (
+                    <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-lg p-5">
+                      <div className="flex gap-2 mb-3">
+                        <span className="bg-primary/20 text-primary text-xs px-2 py-0.5 rounded font-bold">Q{idx + 1}</span>
+                        <input value={q.question_text} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].question_text = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-transparent border-b border-white/20 text-white focus:outline-none focus:border-primary font-medium" />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-4 pl-8">
+                        {['a','b','c','d'].map((opt) => (
+                          <div key={opt} className="flex items-center gap-2">
+                            <span className="text-gray-500 text-xs uppercase">{opt}.</span>
+                            <input value={q[`option_${opt}`]} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx][`option_${opt}`] = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1.5 text-sm text-gray-300 focus:outline-none focus:border-primary" />
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="pl-8 flex gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">Ans:</span>
+                          <select value={q.correct_option} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].correct_option = e.target.value; setAiGeneratedQuestions(copy); }} className="bg-white/5 border border-white/10 rounded p-1 text-white"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+                        </div>
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-gray-400">Exp:</span>
+                          <input value={q.explanation} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].explanation = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1 text-gray-300 focus:outline-none focus:border-primary" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

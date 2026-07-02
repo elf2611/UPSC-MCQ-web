@@ -24,17 +24,7 @@ interface Test {
   time_left?: number;
 }
 
-// --- Fallback data ---
-const FALLBACK_FULL: Test[] = [
-  { id: "1", name: "Prelims Mock Test 1", description: "Focus: General Studies Comprehensive", question_count: 100, duration_mins: 120, type: "full", student_count: 12400, status: "completed", score: 104.6 },
-  { id: "2", name: "Prelims Mock Test 2", description: "Focus: Polity & Economy Heavy", question_count: 100, duration_mins: 120, type: "full", student_count: 8200, status: "not_attempted" },
-  { id: "3", name: "Prelims Mock Test 3", description: "Focus: History & Culture Heavy", question_count: 100, duration_mins: 120, type: "full", student_count: 5100, status: "in_progress", remaining_qs: 55, time_left: 65 },
-];
 
-const FALLBACK_SECTIONAL: Test[] = [
-  { id: "4", name: "Polity Sectional Test", description: "Focus: Polity & Governance", question_count: 50, duration_mins: 60, type: "sectional", student_count: 7800, status: "not_attempted" },
-  { id: "5", name: "History Sectional Test", description: "Focus: Ancient & Medieval History", question_count: 50, duration_mins: 60, type: "sectional", student_count: 6200, status: "completed", score: 82.3 },
-];
 
 const FEATURED: Test = {
   id: "f1", name: "Full-Length Prelims Mock Test 4", description: "A comprehensive simulation of the UPSC Civil Services Preliminary Examination. Designed to test your stamina, accuracy, and subject knowledge across all core areas.", question_count: 100, duration_mins: 120, type: "full",
@@ -183,8 +173,38 @@ export default function MockTestsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"full" | "sectional">("full");
   const [showModal, setShowModal] = useState(false);
-  const [fullTests, setFullTests] = useState<Test[]>(FALLBACK_FULL);
-  const [sectionalTests, setSectionalTests] = useState<Test[]>(FALLBACK_SECTIONAL);
+  const [loading, setLoading] = useState(true);
+  const [fullTests, setFullTests] = useState<Test[]>([]);
+  const [sectionalTests, setSectionalTests] = useState<Test[]>([]);
+
+  useEffect(() => {
+    const fetchTests = async () => {
+      setLoading(true);
+      const { data: tests } = await supabase.from("tests").select("*");
+      let userAttempts: any[] = [];
+      
+      if (user) {
+        const { data: attempts } = await supabase.from("test_attempts").select("*").eq("user_id", user.uid);
+        if (attempts) userAttempts = attempts;
+      }
+
+      if (tests) {
+        const mappedTests = tests.map(t => {
+          const attempt = userAttempts.find(a => a.test_id === t.id);
+          return {
+            ...t,
+            status: attempt ? "completed" : "not_attempted",
+            score: attempt ? attempt.score : undefined,
+          };
+        });
+
+        setFullTests(mappedTests.filter(t => t.type === "full"));
+        setSectionalTests(mappedTests.filter(t => t.type === "sectional"));
+      }
+      setLoading(false);
+    };
+    fetchTests();
+  }, [user]);
 
   const handleStartTest = (id: string) => {
     router.push(`/test-interface?mode=mock&test_id=${id}`);
@@ -264,9 +284,19 @@ export default function MockTestsPage() {
             </div>
           </button>
 
-          {displayedTests.map(test => (
-            <TestCard key={test.id} test={test} onStart={handleStartTest} />
-          ))}
+          {loading ? (
+             <div className="col-span-full py-12 text-center text-gray-500">Loading mock tests...</div>
+          ) : displayedTests.length === 0 ? (
+             <div className="col-span-full py-20 flex flex-col items-center text-center">
+               <AlertTriangle className="w-12 h-12 text-gray-600 mb-4" />
+               <h3 className="text-xl font-bold text-white mb-2">No mock tests yet.</h3>
+               <p className="text-gray-500">Admin will add them soon.</p>
+             </div>
+          ) : (
+            displayedTests.map(test => (
+              <TestCard key={test.id} test={test} onStart={handleStartTest} />
+            ))
+          )}
         </div>
 
       </div>

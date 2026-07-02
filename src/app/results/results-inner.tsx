@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import {
   CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp,
-  ArrowRight, Clock, Target, RotateCcw, Bookmark
+  ArrowRight, Clock, Target, RotateCcw, Bookmark, Copy
 } from "lucide-react";
 import Link from "next/link";
 
@@ -27,6 +27,12 @@ interface Question {
   explanation?: string;
   subject?: string;
   topic?: string;
+  why_a_wrong?: string;
+  why_b_wrong?: string;
+  why_c_wrong?: string;
+  why_d_wrong?: string;
+  elimination_tip?: string;
+  static_topic_link?: string;
 }
 
 interface AttemptAnswer {
@@ -102,6 +108,12 @@ export default function ResultsInner() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [loading, setLoading] = useState(true);
+  
+  // New States
+  const [queueing, setQueueing] = useState(false);
+  const [queueAdded, setQueueAdded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -152,6 +164,64 @@ export default function ResultsInner() {
     { key: "marked", label: "Marked", count: marked, color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
   ];
 
+  const handleAddToRevisionQueue = async () => {
+    if (!user) return;
+    setQueueing(true);
+    const incorrectIds = answers.filter(a => !a.is_correct).map(a => a.question_id);
+    
+    if (incorrectIds.length > 0) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextReviewStr = tomorrow.toISOString().split("T")[0];
+
+      const upserts = incorrectIds.map(id => ({
+        user_id: user.uid,
+        question_id: id,
+        interval_days: 1,
+        next_review_date: nextReviewStr
+      }));
+      
+      const { error } = await supabase.from("revision_queue").upsert(upserts, { onConflict: "user_id, question_id" });
+      
+      if (!error) {
+        setQueueAdded(true);
+        setToastMsg(`${incorrectIds.length} questions added to your revision queue`);
+        setTimeout(() => setToastMsg(""), 3000);
+      } else {
+        console.error("Queue add error:", error);
+      }
+    } else {
+      setQueueAdded(true); 
+    }
+    setQueueing(false);
+  };
+
+  const handleShare = async () => {
+    const subStats: Record<string, {c: number, total: number}> = {};
+    answers.forEach(a => {
+      const sub = a.questions?.subject;
+      if (sub) {
+        if (!subStats[sub]) subStats[sub] = {c: 0, total: 0};
+        subStats[sub].total++;
+        if (a.is_correct) subStats[sub].c++;
+      }
+    });
+    
+    const breakdown = Object.entries(subStats)
+      .map(([sub, stats]) => `${sub} ${Math.round((stats.c / stats.total) * 100)}%`)
+      .join(", ");
+
+    const text = `I scored ${d.score.toFixed(1)}/${d.total_questions * 2} on a UPSC Prelims test on Prepwise!\nAccuracy: ${accuracy}% | Subject breakdown: ${breakdown}\nTry it free at prepwise.in`;
+    
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#121212]">
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -160,7 +230,7 @@ export default function ResultsInner() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8 relative">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
@@ -168,9 +238,22 @@ export default function ResultsInner() {
             <h1 className="text-3xl font-bold text-white">Test Analysis</h1>
             <p className="text-gray-400 mt-1">Detailed breakdown of your performance.</p>
           </div>
-          <Link href="/mock-tests" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-white/10 px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">
-            Back to Tests <ArrowRight className="w-4 h-4" />
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleAddToRevisionQueue}
+              disabled={queueAdded || queueing}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+                queueAdded ? "bg-green-500/20 text-green-400 border border-green-500/30" : 
+                "bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30"
+              }`}
+            >
+              <Bookmark className="w-4 h-4" />
+              {queueing ? "Adding..." : queueAdded ? "✓ Added to Queue" : "📚 Add wrong answers to Revision Queue"}
+            </button>
+            <Link href="/mock-tests" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-white/10 px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">
+              Back to Tests <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
 
         {/* ── Score Card ─────────────────────────────────────────────────────── */}
@@ -318,10 +401,51 @@ export default function ResultsInner() {
                           );
                         })}
                       </div>
+                      
+                      {/* Explanation */}
                       {q.explanation && (
                         <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
                           <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Explanation</p>
                           <p className="text-gray-300 text-sm leading-relaxed">{q.explanation}</p>
+                        </div>
+                      )}
+
+                      {/* Section A: Why wrong options fail */}
+                      {(q.why_a_wrong || q.why_b_wrong || q.why_c_wrong || q.why_d_wrong) && (
+                        <div className="mt-4 bg-[#1a1a1a] border border-amber-500/30 rounded-xl p-4">
+                          <h4 className="text-sm font-semibold text-amber-500 mb-3">Why the wrong options fail</h4>
+                          <div className="space-y-2">
+                            {(['A','B','C','D'] as const).map(opt => {
+                              const wrongReason = q[`why_${opt.toLowerCase()}_wrong` as keyof Question] as string;
+                              if (opt !== q.correct_option && wrongReason) {
+                                return (
+                                  <div key={opt} className="text-sm">
+                                    <span className="font-bold text-gray-400">Option {opt}:</span> <span className="text-gray-300">{wrongReason}</span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Section B: Elimination Tip */}
+                      {q.elimination_tip && (
+                        <div className="mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
+                          <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">🎯 Elimination Tip</h4>
+                          <p className="text-sm text-gray-300">{q.elimination_tip}</p>
+                        </div>
+                      )}
+
+                      {/* Section C: Static Connection */}
+                      {q.static_topic_link && (
+                        <div className="mt-3 bg-[#1a1a1a] border border-blue-500/30 rounded-xl p-4">
+                          <h4 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">🔗 Static Syllabus Connection</h4>
+                          <p className="text-sm text-gray-300 mb-3">{q.static_topic_link}</p>
+                          <button onClick={() => window.open(`/practice-tests?topic=${encodeURIComponent(q.topic || "")}`, '_blank')} className="text-xs bg-blue-500/20 text-blue-300 px-3 py-1.5 rounded-md hover:bg-blue-500/30 transition-colors">
+                            Practice this topic →
+                          </button>
                         </div>
                       )}
                     </div>
@@ -345,7 +469,24 @@ export default function ResultsInner() {
           </Link>
         </div>
 
+        {/* ── Bottom Share Card ────────────────────────────────────────────────── */}
+        <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 mt-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div>
+            <h3 className="text-white font-bold text-lg mb-1">{d.mode === "mock" ? "Mock Test" : "Practice Session"} Result</h3>
+            <p className="text-gray-400 text-sm">Score: {d.score.toFixed(1)}/{d.total_questions * 2} • Accuracy: {accuracy}%</p>
+          </div>
+          <button onClick={handleShare} className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 text-white rounded-lg hover:bg-white/10 transition-colors font-medium whitespace-nowrap">
+            {copied ? <span className="text-green-400">Copied! ✓</span> : <><Copy className="w-4 h-4"/> 📋 Copy Result</>}
+          </button>
+        </div>
+
       </div>
+
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl bg-[#1a1a1a] text-amber-500 border border-white/10 flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in">
+          <span className="font-bold text-sm">{toastMsg}</span>
+        </div>
+      )}
     </ProtectedRoute>
   );
 }

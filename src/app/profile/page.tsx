@@ -37,13 +37,30 @@ export default function ProfilePage() {
   const [name, setName] = useState(profile?.name || "");
   const [phone, setPhone] = useState("");
   const [negativeMarking, setNegativeMarking] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+  const [savingField, setSavingField] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [history, setHistory] = useState(DEMO_HISTORY);
 
   useEffect(() => {
     setName(profile?.name || user?.displayName || "");
+    if (profile?.negative_marking !== undefined) setNegativeMarking(profile.negative_marking);
+    if (profile?.notifications_enabled !== undefined) setNotificationsEnabled(profile.notifications_enabled);
+    if (profile?.autosave_enabled !== undefined) setAutosaveEnabled(profile.autosave_enabled);
   }, [profile, user]);
+
+  const handleToggle = async (field: "negative_marking" | "notifications_enabled" | "autosave_enabled", value: boolean) => {
+    if (!user) return;
+    if (field === "negative_marking") setNegativeMarking(value);
+    if (field === "notifications_enabled") setNotificationsEnabled(value);
+    if (field === "autosave_enabled") setAutosaveEnabled(value);
+    
+    setSavingField(field);
+    await supabase.from("profiles").update({ [field]: value }).eq("id", user.uid);
+    setTimeout(() => setSavingField(null), 1000);
+  };
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -301,28 +318,27 @@ export default function ProfilePage() {
                     desc="Enable -0.66 deduction for incorrect answers in practice mode."
                     icon={<Zap className="w-4 h-4 text-amber-400" />}
                     value={negativeMarking}
-                    onChange={setNegativeMarking}
+                    onChange={(v) => handleToggle("negative_marking", v)}
+                    showSaved={savingField === "negative_marking"}
                   />
 
                   <PrefToggle
                     title="Test Notifications"
                     desc="Receive email reminders for new mock tests and daily quizzes."
                     icon={<Bell className="w-4 h-4 text-blue-400" />}
-                    value={true}
-                    onChange={() => {}}
+                    value={notificationsEnabled}
+                    onChange={(v) => handleToggle("notifications_enabled", v)}
+                    showSaved={savingField === "notifications_enabled"}
                   />
 
                   <PrefToggle
                     title="Auto-save Progress"
                     desc="Automatically save your answers during a test in case of disconnection."
                     icon={<Clock className="w-4 h-4 text-green-400" />}
-                    value={true}
-                    onChange={() => {}}
+                    value={autosaveEnabled}
+                    onChange={(v) => handleToggle("autosave_enabled", v)}
+                    showSaved={savingField === "autosave_enabled"}
                   />
-
-                  <button onClick={handleSavePreferences} disabled={saving} className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-primary/90 disabled:opacity-70 transition-colors">
-                    {saving ? "Saving…" : "Save Preferences"}
-                  </button>
                 </div>
               </div>
             )}
@@ -334,7 +350,7 @@ export default function ProfilePage() {
   );
 }
 
-function PrefToggle({ title, desc, icon, value, onChange }: { title: string; desc: string; icon: React.ReactNode; value: boolean; onChange: (v: boolean) => void }) {
+function PrefToggle({ title, desc, icon, value, onChange, showSaved }: { title: string; desc: string; icon: React.ReactNode; value: boolean; onChange: (v: boolean) => void; showSaved?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4 p-4 bg-background border border-white/5 rounded-xl hover:border-white/10 transition-colors">
       <div className="flex items-start gap-3">
@@ -342,7 +358,10 @@ function PrefToggle({ title, desc, icon, value, onChange }: { title: string; des
           {icon}
         </div>
         <div>
-          <p className="text-sm font-medium text-white">{title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-white">{title}</p>
+            {showSaved && <span className="text-xs text-green-400 transition-opacity">Saved ✓</span>}
+          </div>
           <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
         </div>
       </div>

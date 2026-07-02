@@ -4,17 +4,36 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { BookOpen, Menu, User, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export function Navbar() {
   const { user, profile, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
+  const [dueCount, setDueCount] = useState(0);
+
+  useEffect(() => {
+    if (user) {
+      const fetchDueCount = async () => {
+        const todayStr = new Date().toISOString().split("T")[0];
+        const { count } = await supabase
+          .from("revision_queue")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.uid)
+          .lte("next_review_date", todayStr);
+        if (count !== null) setDueCount(count);
+      };
+      fetchDueCount();
+    }
+  }, [user]);
+
   const navLinks = [
     { name: "Home", href: "/" },
     { name: "Practice Tests", href: "/practice-tests" },
     { name: "Mock Tests", href: "/mock-tests" },
+    { name: "Revision", href: "/revision", isRevision: true },
     { name: "Performance", href: "/performance" },
     { name: "Pricing", href: "/pricing" },
     { name: "Daily Current Affairs", href: "/current-affairs" },
@@ -40,11 +59,15 @@ export function Navbar() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className={`text-sm font-medium transition-colors relative pb-1 ${
+                    className={`text-sm font-medium transition-colors relative pb-1 flex items-center gap-1.5 ${
                       isActive ? "text-primary" : "text-gray-300 hover:text-white"
                     }`}
                   >
+                    {link.isRevision && <span className="text-base">📚</span>}
                     {link.name}
+                    {link.isRevision && user && (
+                      <span className="w-2 h-2 rounded-full bg-amber-500 ml-1" />
+                    )}
                     {isActive && (
                       <span className="absolute left-0 bottom-0 w-full h-[2px] bg-primary rounded-t-full" />
                     )}

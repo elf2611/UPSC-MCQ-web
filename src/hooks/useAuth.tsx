@@ -18,6 +18,9 @@ interface UserProfile {
   name: string;
   email: string;
   plan: string;
+  negative_marking?: boolean;
+  notifications_enabled?: boolean;
+  autosave_enabled?: boolean;
 }
 
 interface AuthContextType {

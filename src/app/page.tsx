@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { BookOpen, Award, Target, Bookmark, FileText, Clock, CheckCircle2, ChevronRight, PlayCircle, Plus, ChevronDown } from "lucide-react";
+import { 
+  BookOpen, Award, Target, Bookmark, FileText, Clock, 
+  CheckCircle2, ChevronRight, PlayCircle, Plus, ChevronDown,
+  XCircle, Link as LinkIcon, RefreshCw, Flame, BarChart2
+} from "lucide-react";
 
 export default function Home() {
   return (
@@ -14,7 +18,7 @@ export default function Home() {
               Master UPSC Prelims with PYQ-Based Mock Tests
             </h1>
             <p className="text-lg text-gray-300 mb-4">
-              Your ultimate companion for cracking Prelims with accuracy.
+              The only UPSC platform that explains why wrong answers are wrong — not just what's right.
             </p>
             <p className="text-sm text-gray-400 mb-10 italic">
               Curated by UPSC aspirants who've cleared Prelims.
@@ -104,34 +108,37 @@ export default function Home() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <FeatureCard 
-            icon={<BookOpen className="w-5 h-5 text-gray-400" />}
-            title="Topic-wise Practice"
-            description="Filter MCQs by subject/topic."
+            icon={<XCircle className="w-5 h-5 text-red-500" />}
+            title="Why Wrong Explanations"
+            description="Every wrong option is explained. We show exactly why A, B, and C fail — so you stop making the same mistake twice."
+            amberStyle
           />
           <FeatureCard 
-            icon={<Clock className="w-5 h-5 text-gray-400" />}
-            title="Full-Length Mock Tests"
-            description="Timed tests with negative marking."
+            icon={<Target className="w-5 h-5 text-amber-500" />}
+            title="Elimination Technique Tips"
+            description="UPSC-specific logic for every question. Learn to eliminate options confidently even when you don't know the answer."
+            amberStyle
           />
           <FeatureCard 
-            icon={<Target className="w-5 h-5 text-gray-400" />}
-            title="Performance Analytics"
-            description="Track accuracy and weak areas."
+            icon={<LinkIcon className="w-5 h-5 text-amber-500" />}
+            title="Current Affairs → Syllabus Links"
+            description="Every CA question is linked to the static syllabus topic it connects to. Bridge the gap between The Hindu and your textbook."
+            amberStyle
           />
           <FeatureCard 
-            icon={<Bookmark className="w-5 h-5 text-primary" />}
-            title="Bookmark & Revise"
-            description="Save questions for later."
+            icon={<RefreshCw className="w-5 h-5 text-gray-400" />}
+            title="Spaced Repetition Revision"
+            description="Our SRS system automatically resurfaces what you forget at the perfect time. Science-backed, habit-forming."
           />
           <FeatureCard 
-            icon={<FileText className="w-5 h-5 text-primary" />}
-            title="Detailed Explanations"
-            description="Every answer explained."
+            icon={<Flame className="w-5 h-5 text-gray-400" />}
+            title="Daily Streak System"
+            description="Build the daily practice habit that separates those who clear Prelims from those who repeat it."
           />
           <FeatureCard 
-            icon={<Clock className="w-5 h-5 text-gray-400" />}
-            title="Year-wise PYQs"
-            description="Practice by exam year."
+            icon={<BarChart2 className="w-5 h-5 text-gray-400" />}
+            title="All India Benchmarking"
+            description="Know where you stand against serious aspirants preparing right now. No illusions, just honest performance data."
           />
         </div>
       </section>
@@ -309,10 +316,15 @@ export default function Home() {
   );
 }
 
-function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
+function FeatureCard({ icon, title, description, amberStyle = false }: { icon: React.ReactNode, title: string, description: string, amberStyle?: boolean }) {
   return (
-    <div className="bg-[#1a1a1a] p-6 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
-      <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center mb-4">
+    <div className={`p-6 rounded-lg border transition-colors relative ${amberStyle ? 'bg-[#1a1a1a] border-amber-500/30 hover:border-amber-500/50 shadow-[0_0_15px_rgba(255,191,0,0.05)]' : 'bg-[#1a1a1a] border-white/5 hover:border-white/10'}`}>
+      {amberStyle && (
+        <span className="absolute top-4 right-4 bg-amber-500/10 text-amber-500 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+          Only on Prepwise
+        </span>
+      )}
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${amberStyle ? 'bg-amber-500/10 text-amber-500' : 'bg-[#222]'}`}>
         {icon}
       </div>
       <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
