@@ -44,12 +44,16 @@ export async function POST(request: NextRequest) {
     const pdfData = await pdfParse(buffer)
     const extractedText = pdfData.text?.trim()
     
-    if (!extractedText || extractedText.length < 50) {
+    if (!extractedText || extractedText.length < 100) {
       return NextResponse.json({
-        error: 'Could not extract text from this PDF. ' +
-               'It may be a scanned/image-based PDF. ' +
-               'Please use a PDF with selectable text, ' +
-               'or use the JSON upload option below.'
+        error: 'This PDF appears to be a scanned document ' +
+               '(image-based). pdf-parse can only extract text ' +
+               'from PDFs with a text layer.\n\n' +
+               'SOLUTION: Upload this PDF to ChatGPT, Gemini, ' +
+               'or Claude and use the prompt below, then paste ' +
+               'the JSON result in the "Paste JSON" tab.',
+        isScannedPdf: true,
+        suggestion: 'Use the Paste JSON tab instead'
       }, { status: 422 })
     }
     

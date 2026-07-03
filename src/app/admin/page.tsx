@@ -75,6 +75,12 @@ export default function AdminPage() {
   const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState<Record<string, unknown>[]>([]);
   const [aiSaveStats, setAiSaveStats] = useState<Record<string, unknown> | null>(null);
 
+  const [saving, setSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [errorStr, setErrorStr] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
   useEffect(() => {
     if (activeTab === "manage") {
       fetchQuestions();
@@ -107,21 +113,27 @@ export default function AdminPage() {
     setLoading(true);
     setMessage("");
 
-    const questionData = {
+    // CORE fields — these exist in every fresh Supabase questions table
+    const questionData: Record<string, unknown> = {
       subject,
       topic,
-      difficulty,
+      difficulty: difficulty.toLowerCase(),
       question_text: questionText,
       option_a: optionA,
       option_b: optionB,
       option_c: optionC,
       option_d: optionD,
-      correct_option: correctOption,
+      correct_option: correctOption.toLowerCase(),
       explanation,
-      option_a_explanation: correctOption !== 'A' ? optionAExplanation : null,
-      option_b_explanation: correctOption !== 'B' ? optionBExplanation : null,
-      option_c_explanation: correctOption !== 'C' ? optionCExplanation : null,
-      option_d_explanation: correctOption !== 'D' ? optionDExplanation : null,
+    };
+
+    // EXTENDED fields — only added after you run supabase_setup.sql
+    // Wrapped in try/catch: if the column doesn't exist, we skip it gracefully
+    const extendedData: Record<string, unknown> = {
+      option_a_explanation: correctOption.toUpperCase() !== 'A' ? optionAExplanation : '',
+      option_b_explanation: correctOption.toUpperCase() !== 'B' ? optionBExplanation : '',
+      option_c_explanation: correctOption.toUpperCase() !== 'C' ? optionCExplanation : '',
+      option_d_explanation: correctOption.toUpperCase() !== 'D' ? optionDExplanation : '',
       elimination_tip: eliminationTip,
       memory_trick: memoryTrick,
       static_topic_link: staticTopicLink,
@@ -130,16 +142,33 @@ export default function AdminPage() {
       revision_priority: revisionPriority,
       source,
       year: source === 'PYQ' ? year : null,
-      tags: tags.split(",").map(t => t.trim()).filter(Boolean)
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+      language: 'en',
     };
+
+    // First try with all fields
+    let finalData = { ...questionData, ...extendedData };
 
     let error;
     if (editingQuestion) {
-      const { error: updateError } = await supabase.from("questions").update(questionData).eq("id", editingQuestion.id);
-      error = updateError;
+      const { error: updateError } = await supabase.from("questions").update(finalData).eq("id", editingQuestion.id);
+      // If schema error, retry with only core fields
+      if (updateError?.message?.includes('column')) {
+        const { error: retryError } = await supabase.from("questions").update(questionData).eq("id", editingQuestion.id);
+        error = retryError;
+      } else {
+        error = updateError;
+      }
     } else {
-      const { error: insertError } = await supabase.from("questions").insert(questionData);
-      error = insertError;
+      const { error: insertError } = await supabase.from("questions").insert(finalData);
+      // If schema error (missing columns), retry with only core fields
+      if (insertError?.message?.includes('column')) {
+        console.warn('Extended columns not found, saving with core fields only. Run supabase_setup.sql to add all columns.');
+        const { error: retryError } = await supabase.from("questions").insert(questionData);
+        error = retryError;
+      } else {
+        error = insertError;
+      }
     }
 
     if (error) {
@@ -240,11 +269,17 @@ export default function AdminPage() {
 
         const res = await fetch("/api/extract-pdf", { method: "POST", body: formData });
         
-        // Safe fetch wrapper to handle Vercel HTML error pages gracefully
         const contentType = res.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Extraction failed");
+          if (!res.ok) {
+            if (data.isScannedPdf) {
+              setValidationErrors([data.error]);
+              setAiExtracting(false);
+              return;
+            }
+            throw new Error(data.error || "Extraction failed");
+          }
           setAiExtractedContext(data.text);
         } else {
           const textResponse = await res.text();
@@ -325,47 +360,85 @@ export default function AdminPage() {
   };
 
   const handleBulkSave = async () => {
-    let saved = 0, skipped = 0, failed = 0;
-    const { data: existing } = await supabase.from("questions").select("question_text");
-    const existingTexts = new Set(existing?.map(q => q.question_text) || []);
+    setSaving(true)
+    setSaveProgress(0)
+    setErrorStr("")
+    setSuccessMessage("")
+    const errors: string[] = []
+    let saved = 0
+    let schemaLimited = false // tracks if we fell back to core-only insert
 
-    for (const q of aiGeneratedQuestions) {
-      if (existingTexts.has(q.question_text)) {
-        skipped++;
-        continue;
-      }
-      
-      const toInsert = { ...q } as Record<string, unknown>;
-      
-      // Handle AI format which uses why_x_wrong instead of option_x_explanation
-      if (toInsert.why_a_wrong !== undefined) {
-        toInsert.option_a_explanation = toInsert.why_a_wrong;
-        delete toInsert.why_a_wrong;
-      }
-      if (toInsert.why_b_wrong !== undefined) {
-        toInsert.option_b_explanation = toInsert.why_b_wrong;
-        delete toInsert.why_b_wrong;
-      }
-      if (toInsert.why_c_wrong !== undefined) {
-        toInsert.option_c_explanation = toInsert.why_c_wrong;
-        delete toInsert.why_c_wrong;
-      }
-      if (toInsert.why_d_wrong !== undefined) {
-        toInsert.option_d_explanation = toInsert.why_d_wrong;
-        delete toInsert.why_d_wrong;
+    for (let i = 0; i < aiGeneratedQuestions.length; i++) {
+      const q = aiGeneratedQuestions[i] as any
+
+      // Validate required fields
+      if (!q.question_text || !q.option_a || !q.option_b || !q.option_c || !q.option_d) {
+        errors.push(`Question ${i + 1}: Missing required fields (question_text, options)`)
+        setSaveProgress(Math.round(((i + 1) / aiGeneratedQuestions.length) * 100))
+        continue
       }
 
-      const { error } = await supabase.from("questions").insert(toInsert);
+      // CORE row — always works
+      const coreRow = {
+        question_text: String(q.question_text).trim(),
+        option_a: String(q.option_a).trim(),
+        option_b: String(q.option_b).trim(),
+        option_c: String(q.option_c).trim(),
+        option_d: String(q.option_d).trim(),
+        correct_option: String(q.correct_option || 'a').toLowerCase().trim(),
+        explanation: String(q.explanation || '').trim(),
+        difficulty: String(q.difficulty || 'medium').toLowerCase().trim(),
+        subject: String(q.subject || 'General').trim(),
+        topic: String(q.topic || '').trim(),
+      }
+
+      // EXTENDED row — requires running supabase_setup.sql
+      const fullRow = {
+        ...coreRow,
+        option_a_explanation: String(q.why_a_wrong || q.option_a_explanation || '').trim(),
+        option_b_explanation: String(q.why_b_wrong || q.option_b_explanation || '').trim(),
+        option_c_explanation: String(q.why_c_wrong || q.option_c_explanation || '').trim(),
+        option_d_explanation: String(q.why_d_wrong || q.option_d_explanation || '').trim(),
+        elimination_tip: String(q.elimination_tip || '').trim(),
+        static_topic_link: String(q.static_topic_link || '').trim(),
+        source: String(q.source || 'original'),
+        year: q.year || null,
+        tags: Array.isArray(q.tags) ? q.tags : [],
+        language: String(q.language || 'en'),
+      }
+
+      // Try full insert first
+      let { error } = await supabase.from('questions').insert(fullRow)
+
+      // If schema error, fall back to core-only
+      if (error?.message?.includes('column')) {
+        schemaLimited = true
+        const { error: coreError } = await supabase.from('questions').insert(coreRow)
+        error = coreError
+      }
+
       if (error) {
-        console.error("Insert error for question:", q.question_text, error);
-        failed++;
+        console.error(`Q${i+1} error:`, error.message)
+        errors.push(`Question ${i + 1}: ${error.message}`)
       } else {
-        saved++;
+        saved++
       }
+
+      setSaveProgress(Math.round(((i + 1) / aiGeneratedQuestions.length) * 100))
     }
 
-    setAiSaveStats({ saved, skipped, failed, total: aiGeneratedQuestions.length });
-    if (saved > 0) setAiGeneratedQuestions([]);
+    setSaving(false)
+
+    if (errors.length > 0) {
+      setErrorStr(`Saved ${saved}/${aiGeneratedQuestions.length}. Errors:\n${errors.join('\n')}`)
+    }
+
+    if (saved > 0) {
+      const note = schemaLimited ? ' (Run supabase_setup.sql to save explanations & tags too)' : ''
+      setSuccessMessage(`✅ ${saved} question${saved > 1 ? 's' : ''} saved!${note}`)
+      setAiGeneratedQuestions([])
+      setJsonText('')
+    }
   };
 
   const filteredQuestions = questions.filter(q => 
@@ -779,13 +852,41 @@ export default function AdminPage() {
               <h2 className="text-xl font-semibold text-white mb-6">Import Questions</h2>
               
               {validationErrors.length > 0 && (
-                <div className="mb-6 bg-amber-500/20 border border-amber-500/50 p-4 rounded-xl text-amber-400">
-                  <h4 className="font-bold mb-2">Notice / Errors:</h4>
-                  <ul className="list-disc pl-5 text-sm space-y-1">
-                    {validationErrors.map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
-                  </ul>
+                <div className={`mb-6 p-4 rounded-xl border ${validationErrors[0]?.includes('scanned document') ? 'bg-amber-950 border-amber-700' : 'bg-amber-500/20 border-amber-500/50 text-amber-400'}`}>
+                  {validationErrors[0]?.includes('scanned document') ? (
+                    <div>
+                      <p className="text-amber-300 font-medium mb-2">📄 Scanned PDF detected</p>
+                      <p className="text-amber-200 text-sm mb-3">This PDF contains images of text, not actual text. Use this AI prompt to extract the MCQs:</p>
+                      <div className="bg-zinc-900 rounded p-3 text-xs text-zinc-300 font-mono mb-3 whitespace-pre-wrap select-all">
+                        {`Extract all MCQs from this PDF. Return ONLY a JSON array \nwith no extra text or markdown. Each object must have:\nquestion_text, option_a, option_b, option_c, option_d,\ncorrect_option (value must be: a, b, c, or d),\nexplanation, why_a_wrong, why_b_wrong, why_c_wrong, \nwhy_d_wrong, elimination_tip, \ndifficulty (easy, medium, or hard),\nsubject (one of: Polity, History, Geography, Economy, \nEnvironment, Science & Tech, Current Affairs),\ntopic, static_topic_link, tags (array of strings)`}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`Extract all MCQs from this PDF. Return ONLY a JSON array with no extra text or markdown. Each object must have: question_text, option_a, option_b, option_c, option_d, correct_option (value must be: a, b, c, or d), explanation, why_a_wrong, why_b_wrong, why_c_wrong, why_d_wrong, elimination_tip, difficulty (easy, medium, or hard), subject (one of: Polity, History, Geography, Economy, Environment, Science & Tech, Current Affairs), topic, static_topic_link, tags (array of strings)`)
+                          setCopied(true)
+                          setTimeout(() => setCopied(false), 2000)
+                        }}
+                        className="text-xs bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded mr-2"
+                      >
+                        {copied ? '✓ Copied!' : '📋 Copy Prompt'}
+                      </button>
+                      <button
+                        onClick={() => setImportMethod('json')}
+                        className="text-xs bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1.5 rounded"
+                      >
+                        Go to Paste JSON tab →
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h4 className="font-bold mb-2 text-amber-400">Notice / Errors:</h4>
+                      <ul className="list-disc pl-5 text-sm space-y-1 text-amber-400">
+                        {validationErrors.map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -858,6 +959,30 @@ export default function AdminPage() {
 
               {importMethod === "json" && (
                 <div className="space-y-4">
+                  <details className="mb-4">
+                    <summary className="text-sm text-amber-400 cursor-pointer">
+                      💡 How to generate JSON from your PDF using AI
+                    </summary>
+                    <div className="mt-2 bg-zinc-900 rounded-lg p-4">
+                      <p className="text-zinc-400 text-sm mb-2">
+                        Upload your PDF to ChatGPT / Gemini / Claude 
+                        and use this prompt:
+                      </p>
+                      <div className="bg-zinc-800 rounded p-3 text-xs text-zinc-300 font-mono whitespace-pre-wrap select-all">
+                        {`Extract all MCQs from this PDF. Return ONLY a JSON array \nwith no extra text or markdown. Each object must have:\nquestion_text, option_a, option_b, option_c, option_d,\ncorrect_option (value must be: a, b, c, or d),\nexplanation, why_a_wrong, why_b_wrong, why_c_wrong, \nwhy_d_wrong, elimination_tip, \ndifficulty (easy, medium, or hard),\nsubject (one of: Polity, History, Geography, Economy, \nEnvironment, Science & Tech, Current Affairs),\ntopic, static_topic_link, tags (array of strings)`}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`Extract all MCQs from this PDF. Return ONLY a JSON array with no extra text or markdown. Each object must have: question_text, option_a, option_b, option_c, option_d, correct_option (value must be: a, b, c, or d), explanation, why_a_wrong, why_b_wrong, why_c_wrong, why_d_wrong, elimination_tip, difficulty (easy, medium, or hard), subject (one of: Polity, History, Geography, Economy, Environment, Science & Tech, Current Affairs), topic, static_topic_link, tags (array of strings)`)
+                          setCopied(true)
+                          setTimeout(() => setCopied(false), 2000)
+                        }}
+                        className="text-xs bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded mt-3"
+                      >
+                        {copied ? '✓ Copied!' : '📋 Copy Prompt'}
+                      </button>
+                    </div>
+                  </details>
                   <p className="text-sm text-gray-400">
                     Paste an array of questions in JSON format. The system will automatically validate the schema and fill in missing fields with defaults.
                   </p>
@@ -904,13 +1029,28 @@ export default function AdminPage() {
               </div>
             )}
 
-            {aiSaveStats && (
+            {saving && (
+              <div className="bg-blue-500/20 border border-blue-500/50 p-4 rounded-xl flex items-center gap-4 text-blue-400">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+                <div className="flex-1">
+                  <p className="font-bold">Saving to Database...</p>
+                  <div className="w-full bg-blue-950 rounded-full h-2.5 mt-2 overflow-hidden">
+                    <div className="bg-blue-400 h-2.5" style={{ width: `${saveProgress}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {successMessage && (
               <div className="bg-green-500/20 border border-green-500/50 p-4 rounded-xl flex items-center gap-4 text-green-400">
                 <CheckCircle2 className="w-6 h-6" />
-                <div>
-                  <p className="font-bold">Save Complete</p>
-                  <p className="text-sm">Total Processed: {aiSaveStats.total as number} | Saved: {aiSaveStats.saved as number} | Skipped (Duplicates): {aiSaveStats.skipped as number} | Failed: {aiSaveStats.failed as number}</p>
-                </div>
+                <p className="font-bold">{successMessage}</p>
+              </div>
+            )}
+            
+            {errorStr && (
+              <div className="bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-400 whitespace-pre-wrap">
+                {errorStr}
               </div>
             )}
 
@@ -951,58 +1091,85 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="text-sm">
-                      {aiGeneratedQuestions.map((q, idx) => (
+                      {aiGeneratedQuestions.map((q, idx) => {
+                        const correctText = {
+                          'a': q.option_a,
+                          'b': q.option_b,
+                          'c': q.option_c,
+                          'd': q.option_d,
+                        }[(q.correct_option as string)?.toLowerCase()];
+
+                        const difficultyColor = {
+                          'easy': 'bg-green-900 text-green-300',
+                          'medium': 'bg-amber-900 text-amber-300',
+                          'hard': 'bg-red-900 text-red-300',
+                        }[(q.difficulty as string)?.toLowerCase()] || 'bg-zinc-700 text-zinc-300';
+
+                        return (
                         <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                           <td className="py-4 text-gray-400">{idx + 1}</td>
                           <td className="py-4 pr-4">
-                            <div className="max-w-md">
-                              <input 
-                                value={q.question_text as string} 
-                                onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].question_text = e.target.value; setAiGeneratedQuestions(copy); }} 
-                                className="w-full bg-transparent text-gray-300 focus:outline-none focus:border-b focus:border-primary pb-1"
-                              />
+                            <div className="max-w-md truncate text-gray-300">
+                              {q.question_text as string}
                             </div>
                           </td>
-                          <td className="py-4 pr-4">
-                            <input 
-                              value={q.subject as string} 
-                              onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].subject = e.target.value; setAiGeneratedQuestions(copy); }} 
-                              className="w-24 bg-transparent text-gray-300 focus:outline-none focus:border-b focus:border-primary pb-1"
-                            />
+                          <td className="py-4 pr-4 text-gray-300">
+                            {q.subject as string}
                           </td>
                           <td className="py-4 pr-4">
-                            <select 
-                              value={q.difficulty as string} 
-                              onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].difficulty = e.target.value; setAiGeneratedQuestions(copy); }}
-                              className="bg-transparent text-gray-300 focus:outline-none"
-                            >
-                              <option>Easy</option>
-                              <option>Medium</option>
-                              <option>Hard</option>
-                            </select>
+                            <span className={`px-2 py-1 rounded-full text-xs ${difficultyColor}`}>
+                              {q.difficulty as string}
+                            </span>
                           </td>
                           <td className="py-4 text-center">
-                            <select 
-                              value={q.correct_option as string} 
-                              onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].correct_option = e.target.value; setAiGeneratedQuestions(copy); }}
-                              className="bg-transparent text-amber-400 font-bold focus:outline-none"
-                            >
-                              <option>A</option>
-                              <option>B</option>
-                              <option>C</option>
-                              <option>D</option>
-                            </select>
+                            <span className="text-green-400 font-medium whitespace-nowrap text-xs">
+                              {(q.correct_option as string)?.toUpperCase()}. {typeof correctText === 'string' ? correctText.substring(0,40) : ''}...
+                            </span>
                           </td>
                           <td className="py-4 text-right">
-                            <button 
-                              onClick={() => { const copy = [...aiGeneratedQuestions]; copy.splice(idx, 1); setAiGeneratedQuestions(copy); }}
-                              className="p-1.5 text-red-400 hover:text-white hover:bg-red-500 rounded-md transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => {
+                                  setEditingQuestion(q);
+                                  setSubject((q.subject as string) || "Polity");
+                                  setTopic((q.topic as string) || "");
+                                  setDifficulty((q.difficulty as string) || "Medium");
+                                  setYear((q.year as number) || new Date().getFullYear());
+                                  setQuestionText((q.question_text as string) || "");
+                                  setOptionA((q.option_a as string) || "");
+                                  setOptionB((q.option_b as string) || "");
+                                  setOptionC((q.option_c as string) || "");
+                                  setOptionD((q.option_d as string) || "");
+                                  setCorrectOption((q.correct_option as string)?.toUpperCase() || "A");
+                                  setExplanation((q.explanation as string) || "");
+                                  setOptionAExplanation(((q.why_a_wrong || q.option_a_explanation) as string) || "");
+                                  setOptionBExplanation(((q.why_b_wrong || q.option_b_explanation) as string) || "");
+                                  setOptionCExplanation(((q.why_c_wrong || q.option_c_explanation) as string) || "");
+                                  setOptionDExplanation(((q.why_d_wrong || q.option_d_explanation) as string) || "");
+                                  setEliminationTip((q.elimination_tip as string) || "");
+                                  setMemoryTrick((q.memory_trick as string) || "");
+                                  setStaticTopicLink((q.static_topic_link as string) || "");
+                                  setRelatedCurrentAffairs((q.related_current_affairs as string) || "");
+                                  setEstimatedSolvingTime((q.estimated_solving_time as number) || 60);
+                                  setRevisionPriority((q.revision_priority as string) || "normal");
+                                  setSource((q.source as string) || "original");
+                                  setTags(Array.isArray(q.tags) ? (q.tags as string[]).join(", ") : (q.tags as string) || "");
+                                  setActiveTab("add");
+                                }}
+                                className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button 
+                                onClick={() => { const copy = [...aiGeneratedQuestions]; copy.splice(idx, 1); setAiGeneratedQuestions(copy); }}
+                                className="p-1.5 text-red-400 hover:text-white hover:bg-red-500 rounded-md transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>
