@@ -4,8 +4,7 @@ export async function updateStatistics(
   userId: string,
   subjectId: string,
   topicId: string | null | undefined,
-  isCorrect: boolean,
-  timeTakenSeconds: number = 0
+  isCorrect: boolean
 ) {
   if (!userId || !subjectId) return;
 

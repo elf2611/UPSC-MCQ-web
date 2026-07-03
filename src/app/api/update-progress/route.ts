@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
       bonusAwarded: streakResult.bonusAwarded,
       newBadges
     });
-  } catch (error: any) {
-    console.error("Update progress API error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("Progress update error:", error);
+    return NextResponse.json({ error: (error as Error).message || "Internal server error" }, { status: 500 });
   }
 }

@@ -59,7 +59,7 @@ export async function callGemini(payload: GenerateRequestPayload): Promise<Gener
       topic: payload.config.topic !== "Auto" ? payload.config.topic : q.topic,
       source: payload.config.source,
     }));
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error parsing Gemini JSON:", err, rawText);
     throw new Error("Failed to parse Gemini output into valid JSON.");
   }

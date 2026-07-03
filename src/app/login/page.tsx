@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BookOpen, LogIn, Mail } from "lucide-react";
 
-export default function LoginPage() {
+function LoginContent() {
   const { signInWithEmail, signInWithGoogle } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get("redirect") || "/profile";
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,8 +23,8 @@ export default function LoginPage() {
       setError("");
       setLoading(true);
       await signInWithEmail(email, password);
-      router.push("/practice-tests");
-    } catch (err: any) {
+      setTimeout(() => router.push(redirectPath), 1000);
+    } catch {
       setError("Failed to sign in. Please check your credentials.");
     } finally {
       setLoading(false);
@@ -33,8 +36,8 @@ export default function LoginPage() {
       setError("");
       setLoading(true);
       await signInWithGoogle();
-      router.push("/practice-tests");
-    } catch (err: any) {
+      router.push(redirectPath);
+    } catch {
       setError("Failed to sign in with Google.");
     } finally {
       setLoading(false);
@@ -148,12 +151,20 @@ export default function LoginPage() {
         </button>
 
         <p className="mt-8 text-center text-sm text-gray-400">
-          Don't have an account?{" "}
-          <Link href="/signup" className="font-medium text-primary hover:text-primary/80 transition-colors">
+          Don&apos;t have an account?{" "}
+          <Link href={`/signup${searchParams.toString() ? `?${searchParams.toString()}` : ''}`} className="font-medium text-primary hover:text-primary/80 transition-colors">
             Sign up
           </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[calc(100vh-4rem)] flex items-center justify-center text-white">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

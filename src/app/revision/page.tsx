@@ -1,12 +1,11 @@
 "use client";
 
 import { ProtectedRoute } from "@/components/protected-route";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { CheckCircle2, XCircle, ArrowRight, Activity, Calendar as CalIcon } from "lucide-react";
+import { CheckCircle2, XCircle, Activity, Calendar as CalIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ActivityHeatmap } from "@/components/ui/ActivityHeatmap";
 
 // --- Types ---
@@ -35,20 +34,9 @@ interface RevisionItem {
   questions: Question;
 }
 
-// --- Heatmap logic ---
-function generatePast90Days() {
-  const dates = [];
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().split("T")[0]);
-  }
-  return dates;
-}
 
 export default function RevisionPage() {
   const { user } = useAuth();
-  const router = useRouter();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -78,7 +66,7 @@ export default function RevisionPage() {
         .lte("next_review_date", todayStr);
 
       if (qData) {
-        setQueue(qData as any);
+        setQueue(qData as unknown as RevisionItem[]);
       }
 
       // 2. Fetch future if empty
@@ -123,22 +111,12 @@ export default function RevisionPage() {
     loadData();
   }, [user]);
 
-  const dates90 = useMemo(() => generatePast90Days(), []);
-  
-  const totalInQueue = queue.length; // Actually just due today, but we don't have total queue count without another query. We'll use due today.
   const reviewedThisWeek = Object.entries(heatmapMap).filter(([dateStr]) => {
     const d = new Date(dateStr);
     const ago7 = new Date();
     ago7.setDate(ago7.getDate() - 7);
     return d >= ago7;
-  }).reduce((acc, [_, count]) => acc + count, 0);
-
-  const getHeatmapColor = (count: number) => {
-    if (count === 0) return "bg-zinc-800 border-zinc-700";
-    if (count <= 5) return "bg-amber-900 border-amber-800";
-    if (count <= 15) return "bg-amber-700 border-amber-600";
-    return "bg-amber-500 border-amber-400";
-  };
+  }).reduce((acc, [, count]) => acc + count, 0);
 
   const handleSelectOption = (opt: string) => {
     if (isAnswered) return;
@@ -387,7 +365,7 @@ export default function RevisionPage() {
                         {/* Confidence Actions */}
                         <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 mt-4 flex flex-col items-center text-center">
                           <h4 className="text-white font-medium mb-1">How well did you know this?</h4>
-                          <p className="text-sm text-gray-400 mb-6">Your choice determines when you'll see this question again.</p>
+                          <p className="text-sm text-gray-400 mb-6">Your choice determines when you&apos;ll see this question again.</p>
                           
                           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                             <button 

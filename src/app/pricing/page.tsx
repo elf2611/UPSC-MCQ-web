@@ -40,7 +40,7 @@ export default function PricingPage() {
   );
 }
 
-function PricingCard({ title, price, period, description, features, isPopular }: any) {
+function PricingCard({ title, price, period, description, features, isPopular }: { title: string, price: string, period?: string, description: string, features: string[], isPopular?: boolean }) {
   return (
     <div className={`relative bg-card rounded-2xl p-8 border ${isPopular ? 'border-primary shadow-[0_0_30px_rgba(255,191,0,0.2)]' : 'border-white/10'}`}>
       {isPopular && (

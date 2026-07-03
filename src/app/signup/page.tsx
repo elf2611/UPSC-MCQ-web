@@ -22,7 +22,7 @@ export default function SignupPage() {
       setLoading(true);
       await signUpWithEmail(name, email, password);
       router.push("/practice-tests");
-    } catch (err: any) {
+    } catch {
       setError("Failed to create an account. Email might be in use.");
     } finally {
       setLoading(false);
@@ -35,7 +35,7 @@ export default function SignupPage() {
       setLoading(true);
       await signInWithGoogle();
       router.push("/practice-tests");
-    } catch (err: any) {
+    } catch {
       setError("Failed to sign up with Google.");
     } finally {
       setLoading(false);

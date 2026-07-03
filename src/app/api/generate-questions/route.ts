@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
     const questions = await generateQuestions({ text: body.text, config: body.config });
     
     return NextResponse.json({ data: questions });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Generate API error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: (error as Error).message || "Failed to generate questions" }, { status: 500 });
   }
 }

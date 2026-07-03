@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse");
-import * as cheerio from "cheerio";
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Extraction error:", error);
-    return NextResponse.json({ error: error.message || "Failed to extract content" }, { status: 500 });
+    return NextResponse.json({ error: (error as Error).message || "Failed to extract content" }, { status: 500 });
   }
 }

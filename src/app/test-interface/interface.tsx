@@ -1,6 +1,5 @@
 "use client";
 
-import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,18 +27,6 @@ interface Question {
   elimination_tip?: string;
   static_topic_link?: string;
 }
-
-// --- Fallback questions ---
-const FALLBACK_QUESTIONS: Question[] = [
-  { id: "q1", question_text: "Which among the following features of the Indian Constitution is borrowed from the British Constitution?", option_a: "Rule of Law", option_b: "Fundamental Rights", option_c: "Parliamentary Form of Government", option_d: "Directive Principles of State Policy", correct_option: "C", explanation: "The Parliamentary form of Government (Cabinet form of Government) is borrowed from the British Constitution.", subject: "Polity" },
-  { id: "q2", question_text: "The concept of 'Preamble' in the Indian Constitution was borrowed from:", option_a: "United Kingdom", option_b: "United States of America", option_c: "Canada", option_d: "Australia", correct_option: "B", explanation: "The concept of Preamble was borrowed from the US Constitution.", subject: "Polity" },
-  { id: "q3", question_text: "Which of the following is not a Fundamental Right under the Indian Constitution?", option_a: "Right to Equality", option_b: "Right to Property", option_c: "Right to Freedom of Religion", option_d: "Right against Exploitation", correct_option: "B", explanation: "Right to Property was removed by the 44th Amendment Act, 1978.", subject: "Polity" },
-  { id: "q4", question_text: "The 'Battle of Plassey' was fought in which year?", option_a: "1757", option_b: "1764", option_c: "1776", option_d: "1801", correct_option: "A", explanation: "The Battle of Plassey was fought on June 23, 1757.", subject: "History" },
-  { id: "q5", question_text: "Which river is known as the 'Sorrow of Bihar'?", option_a: "Ganga", option_b: "Kosi", option_c: "Son", option_d: "Gandak", correct_option: "B", explanation: "The Kosi river frequently changes its course and causes devastating floods in Bihar.", subject: "Geography" },
-  { id: "q6", question_text: "The 'Doctrine of Lapse' was introduced by which Governor-General?", option_a: "Lord Cornwallis", option_b: "Lord Dalhousie", option_c: "Lord Wellesley", option_d: "Lord Bentinck", correct_option: "B", explanation: "Lord Dalhousie introduced the Doctrine of Lapse.", subject: "History" },
-  { id: "q7", question_text: "Which Article of the Indian Constitution abolishes untouchability?", option_a: "Article 14", option_b: "Article 15", option_c: "Article 16", option_d: "Article 17", correct_option: "D", explanation: "Article 17 abolishes untouchability and forbids its practice in any form.", subject: "Polity" },
-  { id: "q8", question_text: "The Western Ghats are also known as:", option_a: "Sahyadri", option_b: "Vindyas", option_c: "Aravalli", option_d: "Satpura", correct_option: "A", explanation: "The Western Ghats are also known as the Sahyadri mountain range.", subject: "Geography" },
-];
 
 // --- Status Config ---
 const STATUS_CONFIG: Record<QuestionStatus, { bg: string; border: string; label: string }> = {
@@ -130,16 +117,14 @@ export default function TestInterfaceInner() {
           data = fetchedData;
         }
 
-        const finalQuestions = data || FALLBACK_QUESTIONS.slice(0, mode === "custom" ? Math.min(customCount, FALLBACK_QUESTIONS.length) : FALLBACK_QUESTIONS.length);
+        const finalQuestions = data || [];
         setQuestions(finalQuestions);
         const initialStatus: Record<string, QuestionStatus> = {};
         finalQuestions.forEach(q => { initialStatus[q.id] = "not-visited"; });
         setQuestionStatus(initialStatus);
       } catch {
-        setQuestions(FALLBACK_QUESTIONS);
-        const initialStatus: Record<string, QuestionStatus> = {};
-        FALLBACK_QUESTIONS.forEach(q => { initialStatus[q.id] = "not-visited"; });
-        setQuestionStatus(initialStatus);
+        setQuestions([]);
+        setQuestionStatus({});
       }
       setLoading(false);
     };

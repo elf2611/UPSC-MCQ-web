@@ -3,7 +3,6 @@
 import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect } from "react";
 import { Plus, Clock, AlertTriangle, CheckCircle2, CircleDot, Users, ChevronRight, X } from "lucide-react";
-import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -26,12 +25,9 @@ interface Test {
 
 
 
-const FEATURED: Test = {
-  id: "f1", name: "Full-Length Prelims Mock Test 4", description: "A comprehensive simulation of the UPSC Civil Services Preliminary Examination. Designed to test your stamina, accuracy, and subject knowledge across all core areas.", question_count: 100, duration_mins: 120, type: "full",
-};
 
 // --- Custom Test Modal ---
-function CustomTestModal({ onClose, onStart }: { onClose: () => void; onStart: (cfg: any) => void }) {
+function CustomTestModal({ onClose, onStart }: { onClose: () => void; onStart: (cfg: { subjects: string[], questionCount: number, timeLimit: number }) => void }) {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [questionCount, setQuestionCount] = useState(50);
   const [timeLimit, setTimeLimit] = useState(60);
@@ -181,7 +177,7 @@ export default function MockTestsPage() {
     const fetchTests = async () => {
       setLoading(true);
       const { data: tests } = await supabase.from("tests").select("*");
-      let userAttempts: any[] = [];
+      let userAttempts: Record<string, unknown>[] = [];
       
       if (user) {
         const { data: attempts } = await supabase.from("test_attempts").select("*").eq("user_id", user.uid);
@@ -210,13 +206,14 @@ export default function MockTestsPage() {
     router.push(`/test-interface?mode=mock&test_id=${id}`);
   };
 
-  const handleCustomStart = ({ subjects, questionCount, timeLimit }: any) => {
+  const handleCustomStart = ({ subjects, questionCount, timeLimit }: { subjects: string[], questionCount: number, timeLimit: number }) => {
     setShowModal(false);
     const subjectsParam = subjects.join(",");
     router.push(`/test-interface?mode=custom&subjects=${encodeURIComponent(subjectsParam)}&count=${questionCount}&time=${timeLimit * 60}`);
   };
 
   const displayedTests = activeTab === "full" ? fullTests : sectionalTests;
+  const featuredTest = fullTests.length > 0 ? fullTests[0] : null;
 
   return (
     <ProtectedRoute>
@@ -225,6 +222,7 @@ export default function MockTestsPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
 
         {/* Featured Assessment Banner */}
+        {featuredTest && (
         <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-8 mb-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary/5 to-transparent" />
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
@@ -233,25 +231,25 @@ export default function MockTestsPage() {
                 <span className="w-2 h-2 rounded-full bg-amber-400" />
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Featured Assessment</span>
               </div>
-              <h2 className="text-3xl font-serif font-bold text-white mb-3">{FEATURED.name}</h2>
-              <p className="text-gray-400 mb-6 leading-relaxed">{FEATURED.description}</p>
+              <h2 className="text-3xl font-serif font-bold text-white mb-3">{featuredTest.name}</h2>
+              <p className="text-gray-400 mb-6 leading-relaxed">{featuredTest.description}</p>
               <div className="flex flex-wrap gap-6 text-sm text-gray-400">
-                <span className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-400" />{FEATURED.question_count} Questions</span>
-                <span className="flex items-center gap-2"><Clock className="w-4 h-4 text-amber-400" />{FEATURED.duration_mins} Minutes</span>
+                <span className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-400" />{featuredTest.question_count} Questions</span>
+                <span className="flex items-center gap-2"><Clock className="w-4 h-4 text-amber-400" />{featuredTest.duration_mins} Minutes</span>
                 <span className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-400" />Negative Marking (-0.66)</span>
               </div>
             </div>
             <div className="flex flex-col items-start lg:items-end gap-2">
               <button
-                onClick={() => handleStartTest(FEATURED.id)}
+                onClick={() => handleStartTest(featuredTest.id)}
                 className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg font-bold hover:bg-primary/90 transition-colors shadow-[0_0_20px_rgba(255,191,0,0.3)] whitespace-nowrap"
               >
                 Start Test Now <ChevronRight className="w-5 h-5" />
               </button>
-              <p className="text-xs text-gray-500">Closes in 2 days</p>
             </div>
           </div>
         </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center border-b border-white/10 mb-8">

@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
 } from "recharts";
 import {
   CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp,
-  ArrowRight, Clock, Target, RotateCcw, Bookmark, Copy
+  ArrowRight, Clock, RotateCcw, Bookmark, Copy
 } from "lucide-react";
 import Link from "next/link";
 
@@ -52,31 +52,8 @@ interface AttemptData {
   mode: string;
 }
 
-// ── Fallback demo data ─────────────────────────────────────────────────────
-const DEMO_ATTEMPT: AttemptData = {
-  id: "demo", score: 103.5, total_questions: 100,
-  attempted: 85, time_taken: 5820, mode: "mock",
-};
 
-const DEMO_ANSWERS: AttemptAnswer[] = [
-  { question_id: "q1", selected_option: "C", is_correct: true, questions: { id: "q1", question_text: "Which feature of the Indian Constitution is borrowed from the British Constitution?", option_a: "Rule of Law", option_b: "Fundamental Rights", option_c: "Parliamentary Form of Government", option_d: "Directive Principles of State Policy", correct_option: "C", explanation: "The Parliamentary Form of Government is borrowed from the UK. Fundamental Rights come from the US Constitution, and DPSP from Ireland.", subject: "Polity", topic: "Constitutional Framework" } },
-  { question_id: "q2", selected_option: "A", is_correct: false, questions: { id: "q2", question_text: "The concept of 'Preamble' was borrowed from which Constitution?", option_a: "United Kingdom", option_b: "United States of America", option_c: "Canada", option_d: "Australia", correct_option: "B", explanation: "The concept of Preamble was borrowed from the US Constitution.", subject: "Polity", topic: "Preamble" } },
-  { question_id: "q3", selected_option: null, is_correct: false, questions: { id: "q3", question_text: "Which of the following is NOT a Fundamental Right?", option_a: "Right to Equality", option_b: "Right to Property", option_c: "Right to Freedom of Religion", option_d: "Right against Exploitation", correct_option: "B", explanation: "Right to Property was removed by the 44th Amendment Act, 1978.", subject: "Polity", topic: "Fundamental Rights" } },
-  { question_id: "q4", selected_option: "A", is_correct: true, questions: { id: "q4", question_text: "The 'Battle of Plassey' was fought in which year?", option_a: "1757", option_b: "1764", option_c: "1776", option_d: "1801", correct_option: "A", explanation: "The Battle of Plassey was fought on June 23, 1757.", subject: "History", topic: "British Conquest" } },
-  { question_id: "q5", selected_option: "C", is_correct: false, questions: { id: "q5", question_text: "Which river is known as the 'Sorrow of Bihar'?", option_a: "Ganga", option_b: "Kosi", option_c: "Son", option_d: "Gandak", correct_option: "B", explanation: "The Kosi river frequently changes course and causes devastating floods.", subject: "Geography", topic: "Rivers of India" } },
-];
 
-const SUBJECT_DATA = [
-  { subject: "Polity", correct: 14, incorrect: 3, skipped: 3, accuracy: 82 },
-  { subject: "History", correct: 9, incorrect: 6, skipped: 0, accuracy: 60 },
-  { subject: "Geography", correct: 11, incorrect: 4, skipped: 0, accuracy: 73 },
-  { subject: "Economy", correct: 7, incorrect: 6, skipped: 2, accuracy: 54 },
-  { subject: "Environment", correct: 6, incorrect: 7, skipped: 2, accuracy: 46 },
-  { subject: "Sci & Tech", correct: 5, incorrect: 4, skipped: 1, accuracy: 56 },
-  { subject: "Curr. Affairs", correct: 8, incorrect: 6, skipped: 1, accuracy: 57 },
-];
-
-type FilterType = "all" | "correct" | "incorrect" | "unattempted" | "marked";
 
 // ── Circular Progress Ring ─────────────────────────────────────────────────
 function CircleRing({ pct, size = 120, stroke = 10, color = "#ffbf00" }: { pct: number; size?: number; stroke?: number; color?: string }) {
@@ -100,6 +77,7 @@ function CircleRing({ pct, size = 120, stroke = 10, color = "#ffbf00" }: { pct: 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function ResultsInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuth();
   const attemptId = searchParams.get("attempt_id");
 
@@ -117,29 +95,40 @@ export default function ResultsInner() {
 
   useEffect(() => {
     const load = async () => {
-      if (attemptId && user) {
-        const { data: a } = await supabase.from("test_attempts").select("*").eq("id", attemptId).single();
-        if (a) {
-          setAttempt(a);
-          const { data: ans } = await supabase.from("attempt_answers").select("*, questions(*)").eq("attempt_id", attemptId);
-          if (ans) { setAnswers(ans); setLoading(false); return; }
-        }
+      if (!attemptId || !user) {
+        if (!user) return; // Wait for user to load from auth
+        router.push('/');
+        return;
       }
-      // Fallback session + demo
-      const stored = sessionStorage.getItem("last_score");
-      if (stored) {
-        const p = JSON.parse(stored);
-        setAttempt({ id: "local", score: p.score, total_questions: p.total, attempted: p.attempted, time_taken: 0, mode: "practice" });
-      } else {
-        setAttempt(DEMO_ATTEMPT);
+      
+      const { data: a } = await supabase.from("test_attempts").select("*").eq("id", attemptId).single();
+      if (!a) {
+        router.push('/');
+        return;
       }
-      setAnswers(DEMO_ANSWERS);
+
+      if (a.user_id !== user.uid) {
+        router.push('/');
+        return;
+      }
+
+      setAttempt(a);
+      const { data: ans } = await supabase.from("attempt_answers").select("*, questions(*)").eq("attempt_id", attemptId);
+      if (ans) { 
+        setAnswers(ans); 
+      }
       setLoading(false);
     };
     load();
-  }, [attemptId, user]);
+  }, [attemptId, user, router]);
 
-  const d = attempt || DEMO_ATTEMPT;
+  if (loading || !attempt) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#121212]">
+      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  const d = attempt;
   const correct = answers.filter(a => a.is_correct).length;
   const incorrect = answers.filter(a => !a.is_correct && a.selected_option).length;
   const unattempted = answers.filter(a => !a.selected_option).length;
@@ -155,6 +144,32 @@ export default function ResultsInner() {
     if (filter === "marked") return a.is_marked;
     return true;
   });
+
+  type FilterType = "all" | "correct" | "incorrect" | "unattempted" | "marked";
+
+  const subjectStats: Record<string, { correct: number, incorrect: number, skipped: number, total: number }> = {};
+  answers.forEach(a => {
+    const sub = a.questions?.subject;
+    if (sub) {
+      if (!subjectStats[sub]) subjectStats[sub] = { correct: 0, incorrect: 0, skipped: 0, total: 0 };
+      subjectStats[sub].total++;
+      if (a.is_correct) {
+        subjectStats[sub].correct++;
+      } else if (a.selected_option) {
+        subjectStats[sub].incorrect++;
+      } else {
+        subjectStats[sub].skipped++;
+      }
+    }
+  });
+
+  const SUBJECT_DATA = Object.entries(subjectStats).map(([subject, stats]) => ({
+    subject,
+    correct: stats.correct,
+    incorrect: stats.incorrect,
+    skipped: stats.skipped,
+    accuracy: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0
+  }));
 
   const FILTER_CHIPS: { key: FilterType; label: string; count: number; color: string }[] = [
     { key: "all", label: "All", count: answers.length, color: "bg-white/10 text-white border-white/20" },

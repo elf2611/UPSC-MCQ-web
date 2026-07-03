@@ -81,7 +81,7 @@ export async function updateStreak(userId: string): Promise<{ newStreak: number;
 
 export async function checkBadges(userId: string, trigger: string) {
   // We'll run a series of checks based on the trigger or general sweeps
-  const earned: any[] = [];
+  const earned: unknown[] = [];
   
   const grantBadge = async (badge_name: string, badge_type: string) => {
     const { data } = await supabase

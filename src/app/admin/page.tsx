@@ -3,15 +3,15 @@
 import { useState, useEffect } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { supabase } from "@/lib/supabase";
-import { PlusCircle, List, Pencil, Trash2, Search, Brain, BookOpen, Upload, Link as LinkIcon, FileText, Settings, Play, Save, X, Check, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
+import { PlusCircle, List, Pencil, Trash2, Search, Brain, BookOpen, Save, CheckCircle2 } from "lucide-react";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"add" | "manage" | "subjects" | "generator">("add");
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<Record<string, unknown>[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [editingQuestion, setEditingQuestion] = useState<any>(null);
+  const [editingQuestion, setEditingQuestion] = useState<Record<string, unknown> | null>(null);
 
   // Form State
   const [subject, setSubject] = useState("Polity");
@@ -41,8 +41,8 @@ export default function AdminPage() {
   const [tags, setTags] = useState("");
 
   // Subjects & Topics State
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [topics, setTopics] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<Record<string, unknown>[]>([]);
+  const [topics, setTopics] = useState<Record<string, unknown>[]>([]);
   const [newSubName, setNewSubName] = useState("");
   const [newSubColor, setNewSubColor] = useState("#6366f1");
   const [newSubIcon, setNewSubIcon] = useState("📚");
@@ -71,8 +71,8 @@ export default function AdminPage() {
   });
   
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState<any[]>([]);
-  const [aiSaveStats, setAiSaveStats] = useState<any>(null);
+  const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState<Record<string, unknown>[]>([]);
+  const [aiSaveStats, setAiSaveStats] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (activeTab === "manage") {
@@ -96,6 +96,7 @@ export default function AdminPage() {
       .select("*")
       .order("created_at", { ascending: false });
     
+    if (error) console.error(error);
     if (data) setQuestions(data);
     setLoading(false);
   };
@@ -240,8 +241,8 @@ export default function AdminPage() {
         if (data.error) throw new Error(data.error);
         setAiExtractedContext(data.text);
       }
-    } catch (e: any) {
-      alert("Extraction failed: " + e.message);
+    } catch (e: unknown) {
+      alert("Extraction failed: " + (e instanceof Error ? e.message : String(e)));
     }
     setAiExtracting(false);
   };
@@ -259,8 +260,8 @@ export default function AdminPage() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setAiGeneratedQuestions(data.data);
-    } catch (e: any) {
-      alert("Generation failed: " + e.message);
+    } catch (e: unknown) {
+      alert("Generation failed: " + (e instanceof Error ? e.message : String(e)));
     }
     setAiGenerating(false);
   };
@@ -276,17 +277,14 @@ export default function AdminPage() {
         continue;
       }
       
+      const { why_a_wrong, why_b_wrong, why_c_wrong, why_d_wrong, ...rest } = q as Record<string, unknown>;
       const toInsert = {
-        ...q,
-        option_a_explanation: q.why_a_wrong,
-        option_b_explanation: q.why_b_wrong,
-        option_c_explanation: q.why_c_wrong,
-        option_d_explanation: q.why_d_wrong,
+        ...rest,
+        option_a_explanation: why_a_wrong,
+        option_b_explanation: why_b_wrong,
+        option_c_explanation: why_c_wrong,
+        option_d_explanation: why_d_wrong,
       };
-      delete toInsert.why_a_wrong;
-      delete toInsert.why_b_wrong;
-      delete toInsert.why_c_wrong;
-      delete toInsert.why_d_wrong;
 
       const { error } = await supabase.from("questions").insert(toInsert);
       if (error) failed++; else saved++;
@@ -297,9 +295,9 @@ export default function AdminPage() {
   };
 
   const filteredQuestions = questions.filter(q => 
-    q.question_text?.toLowerCase().includes(search.toLowerCase()) ||
-    q.subject?.toLowerCase().includes(search.toLowerCase()) ||
-    q.topic?.toLowerCase().includes(search.toLowerCase())
+    (q.question_text as string)?.toLowerCase().includes(search.toLowerCase()) ||
+    (q.subject as string)?.toLowerCase().includes(search.toLowerCase()) ||
+    (q.topic as string)?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -316,7 +314,7 @@ export default function AdminPage() {
           ].map(t => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id as any)}
+              onClick={() => setActiveTab(t.id as "add" | "manage" | "subjects" | "generator")}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
                 activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-gray-400 hover:text-white hover:bg-white/5"
               }`}
@@ -590,19 +588,19 @@ export default function AdminPage() {
                     </tr>
                   ) : (
                     filteredQuestions.map((q) => (
-                      <tr key={q.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                        <td className="py-4 text-gray-300 pr-4">{q.subject}</td>
-                        <td className="py-4 text-gray-300 pr-4">{q.topic}</td>
+                      <tr key={q.id as string} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                        <td className="py-4 text-gray-300 pr-4">{q.subject as string}</td>
+                        <td className="py-4 text-gray-300 pr-4">{q.topic as string}</td>
                         <td className="py-4 text-gray-300 pr-4">
-                          <div className="max-w-md truncate">{q.question_text}</div>
+                          <div className="max-w-md truncate">{q.question_text as string}</div>
                         </td>
                         <td className="py-4 pr-4">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            q.difficulty === 'Easy' ? 'bg-green-500/10 text-green-400' :
-                            q.difficulty === 'Medium' ? 'bg-amber-500/10 text-amber-400' :
+                            (q.difficulty as string) === 'Easy' ? 'bg-green-500/10 text-green-400' :
+                            (q.difficulty as string) === 'Medium' ? 'bg-amber-500/10 text-amber-400' :
                             'bg-red-500/10 text-red-400'
                           }`}>
-                            {q.difficulty}
+                            {q.difficulty as string}
                           </span>
                         </td>
                         <td className="py-4 text-right">
@@ -610,29 +608,29 @@ export default function AdminPage() {
                             <button 
                               onClick={() => {
                                 setEditingQuestion(q);
-                                setSubject(q.subject || "Polity");
-                                setTopic(q.topic || "");
-                                setDifficulty(q.difficulty || "Medium");
-                                setYear(q.year || new Date().getFullYear());
-                                setQuestionText(q.question_text || "");
-                                setOptionA(q.option_a || "");
-                                setOptionB(q.option_b || "");
-                                setOptionC(q.option_c || "");
-                                setOptionD(q.option_d || "");
-                                setCorrectOption(q.correct_option || "A");
-                                setExplanation(q.explanation || "");
-                                setOptionAExplanation(q.option_a_explanation || "");
-                                setOptionBExplanation(q.option_b_explanation || "");
-                                setOptionCExplanation(q.option_c_explanation || "");
-                                setOptionDExplanation(q.option_d_explanation || "");
-                                setEliminationTip(q.elimination_tip || "");
-                                setMemoryTrick(q.memory_trick || "");
-                                setStaticTopicLink(q.static_topic_link || "");
-                                setRelatedCurrentAffairs(q.related_current_affairs || "");
-                                setEstimatedSolvingTime(q.estimated_solving_time || 60);
-                                setRevisionPriority(q.revision_priority || "normal");
-                                setSource(q.source || "original");
-                                setTags(q.tags ? q.tags.join(", ") : "");
+                                setSubject((q.subject as string) || "Polity");
+                                setTopic((q.topic as string) || "");
+                                setDifficulty((q.difficulty as string) || "Medium");
+                                setYear((q.year as number) || new Date().getFullYear());
+                                setQuestionText((q.question_text as string) || "");
+                                setOptionA((q.option_a as string) || "");
+                                setOptionB((q.option_b as string) || "");
+                                setOptionC((q.option_c as string) || "");
+                                setOptionD((q.option_d as string) || "");
+                                setCorrectOption((q.correct_option as string) || "A");
+                                setExplanation((q.explanation as string) || "");
+                                setOptionAExplanation((q.option_a_explanation as string) || "");
+                                setOptionBExplanation((q.option_b_explanation as string) || "");
+                                setOptionCExplanation((q.option_c_explanation as string) || "");
+                                setOptionDExplanation((q.option_d_explanation as string) || "");
+                                setEliminationTip((q.elimination_tip as string) || "");
+                                setMemoryTrick((q.memory_trick as string) || "");
+                                setStaticTopicLink((q.static_topic_link as string) || "");
+                                setRelatedCurrentAffairs((q.related_current_affairs as string) || "");
+                                setEstimatedSolvingTime((q.estimated_solving_time as number) || 60);
+                                setRevisionPriority((q.revision_priority as string) || "normal");
+                                setSource((q.source as string) || "original");
+                                setTags(q.tags ? (q.tags as string[]).join(", ") : "");
                                 setActiveTab("add");
                               }}
                               className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
@@ -640,7 +638,7 @@ export default function AdminPage() {
                               <Pencil className="h-4 w-4" />
                             </button>
                             <button 
-                              onClick={() => handleDelete(q.id)}
+                              onClick={() => handleDelete(q.id as string)}
                               className="p-1.5 text-red-400 hover:text-white hover:bg-red-500 rounded-md transition-colors"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -671,17 +669,17 @@ export default function AdminPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {subjects.map(s => (
-                <div key={s.id} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
+                <div key={s.id as string} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-2xl">{s.icon}</span>
-                    <h3 className="text-lg font-bold text-white" style={{color: s.color}}>{s.name}</h3>
+                    <span className="text-2xl">{s.icon as string}</span>
+                    <h3 className="text-lg font-bold text-white" style={{color: s.color as string}}>{s.name as string}</h3>
                   </div>
                   
                   <div className="space-y-2 mb-4">
                     {topics.filter(t => t.subject_id === s.id).map(t => (
-                      <div key={t.id} className="flex justify-between items-center bg-white/5 p-2 rounded-md">
-                        <span className="text-sm text-gray-300">{t.name}</span>
-                        <button onClick={() => handleDeleteTopic(t.id)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
+                      <div key={t.id as string} className="flex justify-between items-center bg-white/5 p-2 rounded-md">
+                        <span className="text-sm text-gray-300">{t.name as string}</span>
+                        <button onClick={() => handleDeleteTopic(t.id as string)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     ))}
                   </div>
@@ -689,10 +687,10 @@ export default function AdminPage() {
                   {addingTopicTo === s.id ? (
                     <div className="flex gap-2">
                       <input type="text" autoFocus value={newTopicName} onChange={e=>setNewTopicName(e.target.value)} className="flex-1 bg-background border border-white/10 rounded-md py-1.5 px-3 text-sm text-white" placeholder="Topic name..." />
-                      <button onClick={() => handleAddTopic(s.id)} className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-md text-sm">Save</button>
+                      <button onClick={() => handleAddTopic(s.id as string)} className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-md text-sm">Save</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setAddingTopicTo(s.id); setNewTopicName(""); }} className="text-sm text-primary hover:underline flex items-center gap-1">+ Add Topic</button>
+                    <button onClick={() => { setAddingTopicTo(s.id as string); setNewTopicName(""); }} className="text-sm text-primary hover:underline flex items-center gap-1">+ Add Topic</button>
                   )}
                 </div>
               ))}
@@ -714,7 +712,7 @@ export default function AdminPage() {
                   { id: "notes", label: "Paste Raw Notes" },
                   { id: "manual", label: "Manual Topic" },
                 ].map(m => (
-                  <button key={m.id} onClick={() => setAiInputMode(m.id as any)} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${aiInputMode === m.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white hover:bg-white/10'}`}>
+                  <button key={m.id} onClick={() => setAiInputMode(m.id as "text" | "pdf" | "url" | "notes" | "manual")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${aiInputMode === m.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white hover:bg-white/10'}`}>
                     {m.label}
                   </button>
                 ))}
@@ -762,7 +760,7 @@ export default function AdminPage() {
                 <CheckCircle2 className="w-6 h-6" />
                 <div>
                   <p className="font-bold">Save Complete</p>
-                  <p className="text-sm">Total Generated: {aiSaveStats.total} | Saved: {aiSaveStats.saved} | Skipped (Duplicates): {aiSaveStats.skipped} | Failed: {aiSaveStats.failed}</p>
+                  <p className="text-sm">Total Generated: {aiSaveStats.total as number} | Saved: {aiSaveStats.saved as number} | Skipped (Duplicates): {aiSaveStats.skipped as number} | Failed: {aiSaveStats.failed as number}</p>
                 </div>
               </div>
             )}
@@ -781,14 +779,14 @@ export default function AdminPage() {
                     <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-lg p-5">
                       <div className="flex gap-2 mb-3">
                         <span className="bg-primary/20 text-primary text-xs px-2 py-0.5 rounded font-bold">Q{idx + 1}</span>
-                        <input value={q.question_text} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].question_text = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-transparent border-b border-white/20 text-white focus:outline-none focus:border-primary font-medium" />
+                        <input value={q.question_text as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].question_text = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-transparent border-b border-white/20 text-white focus:outline-none focus:border-primary font-medium" />
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 mb-4 pl-8">
                         {['a','b','c','d'].map((opt) => (
                           <div key={opt} className="flex items-center gap-2">
                             <span className="text-gray-500 text-xs uppercase">{opt}.</span>
-                            <input value={q[`option_${opt}`]} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx][`option_${opt}`] = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1.5 text-sm text-gray-300 focus:outline-none focus:border-primary" />
+                            <input value={q[`option_${opt}`] as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx][`option_${opt}`] = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1.5 text-sm text-gray-300 focus:outline-none focus:border-primary" />
                           </div>
                         ))}
                       </div>
@@ -796,11 +794,11 @@ export default function AdminPage() {
                       <div className="pl-8 flex gap-4 text-sm">
                         <div className="flex items-center gap-2">
                           <span className="text-gray-400">Ans:</span>
-                          <select value={q.correct_option} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].correct_option = e.target.value; setAiGeneratedQuestions(copy); }} className="bg-white/5 border border-white/10 rounded p-1 text-white"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+                          <select value={q.correct_option as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].correct_option = e.target.value; setAiGeneratedQuestions(copy); }} className="bg-white/5 border border-white/10 rounded p-1 text-white"><option>A</option><option>B</option><option>C</option><option>D</option></select>
                         </div>
                         <div className="flex items-center gap-2 flex-1">
                           <span className="text-gray-400">Exp:</span>
-                          <input value={q.explanation} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].explanation = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1 text-gray-300 focus:outline-none focus:border-primary" />
+                          <input value={q.explanation as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].explanation = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1 text-gray-300 focus:outline-none focus:border-primary" />
                         </div>
                       </div>
                     </div>

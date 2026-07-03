@@ -2,14 +2,13 @@
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, RadarChart, Radar, PolarGrid,
-  PolarAngleAxis, PolarRadiusAxis
+  ResponsiveContainer
 } from "recharts";
-import { TrendingUp, Target, Award, Flame, ChevronRight, ExternalLink, Activity, Target as TargetIcon } from "lucide-react";
+import { TrendingUp, Award, Flame, ExternalLink, Activity, Target as TargetIcon } from "lucide-react";
 import Link from "next/link";
 import { ActivityHeatmap } from "@/components/ui/ActivityHeatmap";
 
@@ -88,7 +87,7 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
   
   // Data States
-  const [attempts, setAttempts] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<Record<string, unknown>[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [totalPracticed, setTotalPracticed] = useState(0);
   const [overallAccuracy, setOverallAccuracy] = useState(0);
@@ -151,10 +150,10 @@ export default function PerformancePage() {
 
       if (weakData) {
         setWeakTopics(weakData.map(w => ({
-          topic_name: (w.topics as any)?.name || "Unknown Topic",
-          topic_slug: (w.topics as any)?.slug || "",
-          subject_name: (w.subjects as any)?.name || "Unknown Subject",
-          subject_slug: (w.subjects as any)?.slug || "",
+          topic_name: (w.topics as { name?: string })?.name || "Unknown Topic",
+          topic_slug: (w.topics as { slug?: string })?.slug || "",
+          subject_name: (w.subjects as { name?: string })?.name || "Unknown Subject",
+          subject_slug: (w.subjects as { slug?: string })?.slug || "",
           accuracy: Number(w.accuracy_percent),
           attempted: Number(w.total_attempted)
         })));
@@ -334,12 +333,12 @@ export default function PerformancePage() {
             </div>
             <div className="mt-4 space-y-2">
               {attempts.slice(0, 3).map(t => (
-                 <Link key={t.id} href={`/results?attempt_id=${t.id}`} className="flex items-center justify-between p-3 rounded-lg border border-white/5 hover:bg-white/5 transition-colors">
+                 <Link key={t.id as string} href={`/results?attempt_id=${t.id as string}`} className="flex items-center justify-between p-3 rounded-lg border border-white/5 hover:bg-white/5 transition-colors">
                     <div>
-                      <p className="text-gray-300 text-sm font-medium">Test {t.mode}</p>
-                      <p className="text-xs text-gray-600">{new Date(t.created_at).toLocaleDateString()}</p>
+                      <p className="text-gray-300 text-sm font-medium">Test {t.mode as string}</p>
+                      <p className="text-xs text-gray-600">{new Date(t.created_at as string).toLocaleDateString()}</p>
                     </div>
-                    <span className="text-amber-400 font-bold text-sm">{t.score}</span>
+                    <span className="text-amber-400 font-bold text-sm">{t.score as number}</span>
                  </Link>
               ))}
               {attempts.length === 0 && <p className="text-xs text-gray-500">No tests taken yet.</p>}
@@ -355,19 +354,19 @@ export default function PerformancePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {badges.map(b => (
               <div 
-                key={b.id} 
+                key={b.id as string} 
                 className={`flex flex-col items-center text-center p-4 rounded-xl border transition-all ${
                   b.earned ? "bg-amber-500/10 border-amber-500/30" : "bg-background border-white/5 opacity-60 grayscale"
                 }`}
               >
                 <div className={`text-4xl mb-3 ${b.earned ? "drop-shadow-[0_0_15px_rgba(255,191,0,0.4)]" : ""}`}>
-                  {b.icon}
+                  {b.icon as string}
                 </div>
                 <h4 className={`font-bold text-sm mb-1 ${b.earned ? "text-amber-400" : "text-gray-400"}`}>
-                  {b.name}
+                  {b.name as string}
                 </h4>
                 <p className="text-xs text-gray-500 mb-2 leading-tight min-h-[32px] flex items-center justify-center">
-                  {b.desc}
+                  {b.desc as string}
                 </p>
                 <div className="mt-auto text-[10px] font-bold uppercase tracking-wider">
                   {b.earned ? (

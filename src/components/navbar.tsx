@@ -3,31 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { BookOpen, Menu, User, LogOut } from "lucide-react";
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { User, LogOut, Menu } from "lucide-react";
+import { useState } from "react";
 
 export function Navbar() {
   const { user, profile, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  const [dueCount, setDueCount] = useState(0);
 
-  useEffect(() => {
-    if (user) {
-      const fetchDueCount = async () => {
-        const todayStr = new Date().toISOString().split("T")[0];
-        const { count } = await supabase
-          .from("revision_queue")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.uid)
-          .lte("next_review_date", todayStr);
-        if (count !== null) setDueCount(count);
-      };
-      fetchDueCount();
-    }
-  }, [user]);
 
   const navLinks = [
     { name: "Home", href: "/" },

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   User, Mail, Phone, Shield, Calendar, Edit2,
-  ChevronRight, ExternalLink, CreditCard, Clock, Bell, Zap
+  ChevronRight, ExternalLink, Clock, Bell, Zap
 } from "lucide-react";
 import Link from "next/link";
 
@@ -18,16 +18,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "subscription", label: "Subscription" },
   { key: "history", label: "Test History" },
   { key: "preferences", label: "Preferences" },
-];
-
-// ── Demo test history ─────────────────────────────────────────────────────
-const DEMO_HISTORY = [
-  { id: "1", name: "Prelims Mock Test 10", date: "2024-06-28", score: 108.3, total: 200, mode: "mock" },
-  { id: "2", name: "Polity Sectional", date: "2024-06-25", score: 76.5, total: 100, mode: "sectional" },
-  { id: "3", name: "Prelims Mock Test 9", date: "2024-06-22", score: 99.0, total: 200, mode: "mock" },
-  { id: "4", name: "History Practice", date: "2024-06-18", score: 44.0, total: 100, mode: "practice" },
-  { id: "5", name: "Custom Test", date: "2024-06-14", score: 82.5, total: 100, mode: "custom" },
-  { id: "6", name: "Prelims Mock Test 8", date: "2024-06-10", score: 95.0, total: 200, mode: "mock" },
 ];
 
 export default function ProfilePage() {
@@ -42,7 +32,7 @@ export default function ProfilePage() {
   const [savingField, setSavingField] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
-  const [history, setHistory] = useState(DEMO_HISTORY);
+  const [history, setHistory] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
     setName(profile?.name || user?.displayName || "");
@@ -83,15 +73,6 @@ export default function ProfilePage() {
     setSaveMsg("Profile updated!");
     setSaving(false);
     setEditMode(false);
-    setTimeout(() => setSaveMsg(""), 3000);
-  };
-
-  const handleSavePreferences = async () => {
-    if (!user) return;
-    setSaving(true);
-    await supabase.from("profiles").update({ negative_marking: negativeMarking }).eq("id", user.uid);
-    setSaveMsg("Preferences saved!");
-    setSaving(false);
     setTimeout(() => setSaveMsg(""), 3000);
   };
 
@@ -280,21 +261,36 @@ export default function ProfilePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/[0.04]">
-                      {history.map(t => {
-                        const pct = Math.round(((t.score || 0) / (t.total || 200)) * 100);
+                      {history.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-12 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-4xl mb-3">📝</span>
+                              <p className="text-gray-400 font-medium">No tests taken yet</p>
+                              <p className="text-sm text-gray-500 mb-4">Start practicing to see your history here.</p>
+                              <Link href="/practice-tests" className="px-4 py-2 bg-primary/20 text-primary rounded-lg text-sm font-semibold hover:bg-primary/30 transition-colors">
+                                Start Practice
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : history.map(t => {
+                        const score = (t.score as number) || 0;
+                        const total = (t.total as number) || 200;
+                        const pct = Math.round((score / total) * 100);
                         return (
-                          <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="py-3.5 pr-4 text-gray-300 font-medium">{t.name}</td>
-                            <td className="py-3.5 pr-4 text-gray-500 text-xs whitespace-nowrap">{t.date || "—"}</td>
+                          <tr key={t.id as string} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="py-3.5 pr-4 text-gray-300 font-medium">{t.name as string}</td>
+                            <td className="py-3.5 pr-4 text-gray-500 text-xs whitespace-nowrap">{(t.date as string) || "—"}</td>
                             <td className="py-3.5 pr-4">
-                              <span className="text-xs bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded capitalize">{t.mode}</span>
+                              <span className="text-xs bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded capitalize">{t.mode as string}</span>
                             </td>
                             <td className="py-3.5 pr-4 text-center">
-                              <span className={`font-bold ${pct >= 60 ? "text-green-400" : pct >= 40 ? "text-amber-400" : "text-red-400"}`}>{(t.score || 0).toFixed(1)}</span>
+                              <span className={`font-bold ${pct >= 60 ? "text-green-400" : pct >= 40 ? "text-amber-400" : "text-red-400"}`}>{score.toFixed(1)}</span>
                               <span className="text-gray-600 text-xs ml-1">({pct}%)</span>
                             </td>
                             <td className="py-3.5 text-right">
-                              <Link href={`/results?attempt_id=${t.id}`} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 justify-end">
+                              <Link href={`/results?attempt_id=${t.id as string}`} className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 justify-end">
                                 View <ExternalLink className="w-3 h-3" />
                               </Link>
                             </td>

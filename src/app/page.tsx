@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { 
-  BookOpen, Award, Target, Bookmark, FileText, Clock, 
-  CheckCircle2, ChevronRight, PlayCircle, Plus, ChevronDown,
-  XCircle, Link as LinkIcon, RefreshCw, Flame, BarChart2
+  Bookmark, CheckCircle2, ChevronDown,
+  XCircle, Link as LinkIcon, RefreshCw, Flame, BarChart2, Target
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-export default function Home() {
+export default async function Home() {
+  // Fetch dynamic stats
+  const { count: mcqCount } = await supabase.from("questions").select("*", { count: "exact", head: true });
+  const { count: mockCount } = await supabase.from("tests").select("*", { count: "exact", head: true }).eq("type", "full");
+  const { count: userCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+  
   return (
     <div className="bg-[#121212] min-h-screen pt-20">
       
@@ -18,10 +23,10 @@ export default function Home() {
               Master UPSC Prelims with PYQ-Based Mock Tests
             </h1>
             <p className="text-lg text-gray-300 mb-4">
-              The only UPSC platform that explains why wrong answers are wrong — not just what's right.
+              The only UPSC platform that explains why wrong answers are wrong &mdash; not just what&apos;s right.
             </p>
             <p className="text-sm text-gray-400 mb-10 italic">
-              Curated by UPSC aspirants who've cleared Prelims.
+              Curated by UPSC aspirants who&apos;ve cleared Prelims.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
@@ -81,15 +86,15 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-4xl font-bold text-primary mb-2">5,000+</div>
+              <div className="text-4xl font-bold text-primary mb-2">{(mcqCount || 0).toLocaleString()}+</div>
               <div className="text-sm text-gray-400">MCQs</div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-primary mb-2">50+</div>
+              <div className="text-4xl font-bold text-primary mb-2">{(mockCount || 0).toLocaleString()}+</div>
               <div className="text-sm text-gray-400">Mock Tests</div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-primary mb-2">1,000+</div>
+              <div className="text-4xl font-bold text-primary mb-2">{(userCount || 0).toLocaleString()}+</div>
               <div className="text-sm text-gray-400">Active Students</div>
             </div>
             <div>
