@@ -50,10 +50,11 @@ export default function AdminPage() {
   const [newTopicName, setNewTopicName] = useState("");
 
   // AI Generator State
-  const [aiInputMode, setAiInputMode] = useState<"text" | "pdf" | "url" | "notes" | "manual">("text");
+  const [importMethod, setImportMethod] = useState<"pdf" | "json" | "text">("pdf");
+  const [jsonText, setJsonText] = useState("");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [aiSourceText, setAiSourceText] = useState("");
   const [aiPdfFile, setAiPdfFile] = useState<File | null>(null);
-  const [aiUrl, setAiUrl] = useState("");
   const [aiExtracting, setAiExtracting] = useState(false);
   const [aiExtractedContext, setAiExtractedContext] = useState("");
   
@@ -222,29 +223,86 @@ export default function AdminPage() {
     fetchSubjects();
   };
 
-  // --- AI Handlers ---
+  // --- AI / Import Handlers ---
   const handleExtractContext = async () => {
     setAiExtracting(true);
+    setValidationErrors([]);
     try {
-      if (aiInputMode === 'text' || aiInputMode === 'notes') {
+      if (importMethod === 'text') {
         setAiExtractedContext(aiSourceText);
-      } else if (aiInputMode === 'manual') {
-        setAiExtractedContext(`Generate questions for Subject: ${aiConfig.subject}, Topic: ${aiConfig.topic}`);
-      } else {
+      } else if (importMethod === 'pdf') {
+        if (!aiPdfFile) {
+          throw new Error("Please select a PDF file first.");
+        }
+        
         const formData = new FormData();
-        formData.append("type", aiInputMode);
-        if (aiInputMode === 'url') formData.append("url", aiUrl);
-        if (aiInputMode === 'pdf' && aiPdfFile) formData.append("file", aiPdfFile);
+        formData.append("pdf", aiPdfFile);
 
-        const res = await fetch("/api/extract", { method: "POST", body: formData });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setAiExtractedContext(data.text);
+        const res = await fetch("/api/extract-pdf", { method: "POST", body: formData });
+        
+        // Safe fetch wrapper to handle Vercel HTML error pages gracefully
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Extraction failed");
+          setAiExtractedContext(data.text);
+        } else {
+          const textResponse = await res.text();
+          console.error("Non-JSON Response:", textResponse);
+          if (res.status === 413) {
+            throw new Error("File too large. Please upload a smaller PDF (under 10MB).");
+          }
+          throw new Error("Received an invalid response from the server. File might be too large.");
+        }
       }
     } catch (e: unknown) {
-      alert("Extraction failed: " + (e instanceof Error ? e.message : String(e)));
+      setValidationErrors([e instanceof Error ? e.message : String(e)]);
     }
     setAiExtracting(false);
+  };
+
+  const handleValidateJson = () => {
+    setValidationErrors([]);
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (!Array.isArray(parsed)) {
+        throw new Error("JSON must be an array of questions.");
+      }
+      
+      const validated = parsed.map((q, index) => {
+        if (!q.question_text) throw new Error(`Question ${index + 1} is missing 'question_text'.`);
+        if (!q.option_a || !q.option_b || !q.option_c || !q.option_d) {
+          throw new Error(`Question ${index + 1} is missing one or more options.`);
+        }
+        if (!q.correct_option) throw new Error(`Question ${index + 1} is missing 'correct_option'.`);
+        
+        return {
+          question_text: q.question_text,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_option: q.correct_option,
+          explanation: q.explanation || "No explanation provided.",
+          subject: q.subject || "Polity",
+          topic: q.topic || "General",
+          difficulty: q.difficulty || "Medium",
+          tags: q.tags || [],
+          revision_priority: q.revision_priority || "normal",
+          source: q.source || "original",
+          option_a_explanation: q.option_a_explanation || null,
+          option_b_explanation: q.option_b_explanation || null,
+          option_c_explanation: q.option_c_explanation || null,
+          option_d_explanation: q.option_d_explanation || null,
+          elimination_tip: q.elimination_tip || null,
+          memory_trick: q.memory_trick || null,
+        };
+      });
+      
+      setAiGeneratedQuestions(validated);
+    } catch (e: unknown) {
+      setValidationErrors([e instanceof Error ? e.message : "Invalid JSON format."]);
+    }
   };
 
   const handleGenerateQuestions = async () => {
@@ -698,47 +756,122 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ================= AI QUESTION STUDIO ================= */}
+        {/* ================= AI QUESTION STUDIO / IMPORT ================= */}
         {activeTab === "generator" && (
           <div className="space-y-8">
             <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
-              <h2 className="text-xl font-semibold text-white mb-6">AI Question Studio: Content Importer</h2>
+              <h2 className="text-xl font-semibold text-white mb-6">Import Questions</h2>
               
-              <div className="flex flex-wrap gap-2 mb-6">
+              {validationErrors.length > 0 && (
+                <div className="mb-6 bg-amber-500/20 border border-amber-500/50 p-4 rounded-xl text-amber-400">
+                  <h4 className="font-bold mb-2">Notice / Errors:</h4>
+                  <ul className="list-disc pl-5 text-sm space-y-1">
+                    {validationErrors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* 3-Tab UI Header */}
+              <div className="flex border-b border-white/10 mb-6">
                 {[
-                  { id: "text", label: "Paste Article" },
-                  { id: "pdf", label: "Upload PDF" },
-                  { id: "url", label: "Website URL" },
-                  { id: "notes", label: "Paste Raw Notes" },
-                  { id: "manual", label: "Manual Topic" },
-                ].map(m => (
-                  <button key={m.id} onClick={() => setAiInputMode(m.id as "text" | "pdf" | "url" | "notes" | "manual")} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${aiInputMode === m.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white hover:bg-white/10'}`}>
-                    {m.label}
+                  { id: "pdf", label: "📄 PDF Upload" },
+                  { id: "json", label: "📋 Paste JSON" },
+                  { id: "text", label: "📝 Paste Text" }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setImportMethod(tab.id as "pdf" | "json" | "text");
+                      setValidationErrors([]);
+                      setAiGeneratedQuestions([]);
+                      setAiSaveStats(null);
+                    }}
+                    className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+                      importMethod === tab.id
+                        ? "border-amber-500 text-amber-400"
+                        : "border-transparent text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {tab.label}
                   </button>
                 ))}
               </div>
 
-              {aiInputMode === "text" || aiInputMode === "notes" ? (
-                <textarea value={aiSourceText} onChange={e => setAiSourceText(e.target.value)} className="w-full h-40 bg-background border border-white/10 rounded-lg p-4 text-white" placeholder="Paste your text or notes here..." />
-              ) : aiInputMode === "url" ? (
-                <input type="url" value={aiUrl} onChange={e => setAiUrl(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" placeholder="https://example.com/article" />
-              ) : aiInputMode === "pdf" ? (
-                <input type="file" accept=".pdf" onChange={e => setAiPdfFile(e.target.files?.[0] || null)} className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" />
-              ) : (
-                <div className="p-4 border border-dashed border-white/10 rounded-lg text-center text-gray-400">Manual generation will rely entirely on the Subject and Topic configured below.</div>
+              {/* Tab Contents */}
+              {importMethod === "pdf" && (
+                <div className="space-y-4">
+                  <input 
+                    type="file" 
+                    accept=".pdf" 
+                    onChange={e => setAiPdfFile(e.target.files?.[0] || null)} 
+                    className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" 
+                  />
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={handleExtractContext} 
+                      disabled={aiExtracting || !aiPdfFile} 
+                      className="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {aiExtracting ? "Extracting..." : "Step 1: Extract & Preview Content"}
+                    </button>
+                  </div>
+                </div>
               )}
 
-              <div className="mt-4 flex justify-end">
-                <button onClick={handleExtractContext} disabled={aiExtracting} className="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2">
-                  {aiExtracting ? "Extracting..." : "Step 1: Extract & Preview Content"}
-                </button>
-              </div>
+              {importMethod === "text" && (
+                <div className="space-y-4">
+                  <textarea 
+                    value={aiSourceText} 
+                    onChange={e => setAiSourceText(e.target.value)} 
+                    className="w-full h-40 bg-background border border-white/10 rounded-lg p-4 text-white" 
+                    placeholder="Paste your text or notes here to let AI generate questions..." 
+                  />
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={handleExtractContext} 
+                      disabled={aiExtracting || !aiSourceText.trim()} 
+                      className="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
+                    >
+                      Step 1: Extract & Preview Content
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {importMethod === "json" && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-400">
+                    Paste an array of questions in JSON format. The system will automatically validate the schema and fill in missing fields with defaults.
+                  </p>
+                  <textarea 
+                    value={jsonText} 
+                    onChange={e => setJsonText(e.target.value)} 
+                    className="w-full h-64 bg-background border border-white/10 rounded-lg p-4 text-white font-mono text-sm" 
+                    placeholder={'[\n  {\n    "question_text": "...",\n    "option_a": "...",\n    "option_b": "...",\n    "option_c": "...",\n    "option_d": "...",\n    "correct_option": "A"\n  }\n]'} 
+                  />
+                  <div className="flex justify-end">
+                    <button 
+                      onClick={handleValidateJson} 
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-semibold flex items-center gap-2"
+                    >
+                      Validate JSON
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {aiExtractedContext !== "" && (
+            {/* Step 2 AI Configuration (Only for PDF and Text) */}
+            {(importMethod === "pdf" || importMethod === "text") && aiExtractedContext !== "" && (
               <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
                 <h3 className="text-lg font-semibold text-white mb-4">Step 2: Refine Context & Configure AI</h3>
-                <textarea value={aiExtractedContext} onChange={e => setAiExtractedContext(e.target.value)} className="w-full h-48 bg-background border border-white/10 rounded-lg p-4 text-gray-300 text-sm mb-6 font-mono" />
+                <textarea 
+                  value={aiExtractedContext} 
+                  onChange={e => setAiExtractedContext(e.target.value)} 
+                  className="w-full h-48 bg-background border border-white/10 rounded-lg p-4 text-gray-300 text-sm mb-6 font-mono" 
+                />
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div><label className="block text-xs text-gray-400 mb-1">Questions</label><select value={aiConfig.count} onChange={e=>setAiConfig({...aiConfig, count: Number(e.target.value)})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm"><option value="5">5</option><option value="10">10</option><option value="15">15</option></select></div>
@@ -760,49 +893,102 @@ export default function AdminPage() {
                 <CheckCircle2 className="w-6 h-6" />
                 <div>
                   <p className="font-bold">Save Complete</p>
-                  <p className="text-sm">Total Generated: {aiSaveStats.total as number} | Saved: {aiSaveStats.saved as number} | Skipped (Duplicates): {aiSaveStats.skipped as number} | Failed: {aiSaveStats.failed as number}</p>
+                  <p className="text-sm">Total Processed: {aiSaveStats.total as number} | Saved: {aiSaveStats.saved as number} | Skipped (Duplicates): {aiSaveStats.skipped as number} | Failed: {aiSaveStats.failed as number}</p>
                 </div>
               </div>
             )}
 
+            {/* Table Preview */}
             {aiGeneratedQuestions.length > 0 && (
               <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-white">Step 4: Editable Preview</h3>
-                  <button onClick={handleBulkSave} className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2">
-                    <Save className="w-4 h-4" /> Save All to Database
-                  </button>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Preview & Edit</h3>
+                    <p className="text-sm text-gray-400">{aiGeneratedQuestions.length} questions ready to import</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => setAiGeneratedQuestions([])} 
+                      className="border border-white/20 hover:bg-white/10 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                    >
+                      Clear & Start Over
+                    </button>
+                    <button 
+                      onClick={handleBulkSave} 
+                      className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] transition-all"
+                    >
+                      <Save className="w-4 h-4" /> Save All to Database
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-6">
-                  {aiGeneratedQuestions.map((q, idx) => (
-                    <div key={idx} className="bg-[#1a1a1a] border border-white/5 rounded-lg p-5">
-                      <div className="flex gap-2 mb-3">
-                        <span className="bg-primary/20 text-primary text-xs px-2 py-0.5 rounded font-bold">Q{idx + 1}</span>
-                        <input value={q.question_text as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].question_text = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-transparent border-b border-white/20 text-white focus:outline-none focus:border-primary font-medium" />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 mb-4 pl-8">
-                        {['a','b','c','d'].map((opt) => (
-                          <div key={opt} className="flex items-center gap-2">
-                            <span className="text-gray-500 text-xs uppercase">{opt}.</span>
-                            <input value={q[`option_${opt}`] as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx][`option_${opt}`] = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1.5 text-sm text-gray-300 focus:outline-none focus:border-primary" />
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <div className="pl-8 flex gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400">Ans:</span>
-                          <select value={q.correct_option as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].correct_option = e.target.value; setAiGeneratedQuestions(copy); }} className="bg-white/5 border border-white/10 rounded p-1 text-white"><option>A</option><option>B</option><option>C</option><option>D</option></select>
-                        </div>
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className="text-gray-400">Exp:</span>
-                          <input value={q.explanation as string} onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].explanation = e.target.value; setAiGeneratedQuestions(copy); }} className="w-full bg-white/5 border border-white/10 rounded p-1 text-gray-300 focus:outline-none focus:border-primary" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="pb-3 text-sm font-medium text-gray-400">#</th>
+                        <th className="pb-3 text-sm font-medium text-gray-400">Question</th>
+                        <th className="pb-3 text-sm font-medium text-gray-400">Subject</th>
+                        <th className="pb-3 text-sm font-medium text-gray-400">Diff</th>
+                        <th className="pb-3 text-sm font-medium text-gray-400 text-center">Ans</th>
+                        <th className="pb-3 text-sm font-medium text-gray-400 text-right">Remove</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm">
+                      {aiGeneratedQuestions.map((q, idx) => (
+                        <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                          <td className="py-4 text-gray-400">{idx + 1}</td>
+                          <td className="py-4 pr-4">
+                            <div className="max-w-md">
+                              <input 
+                                value={q.question_text as string} 
+                                onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].question_text = e.target.value; setAiGeneratedQuestions(copy); }} 
+                                className="w-full bg-transparent text-gray-300 focus:outline-none focus:border-b focus:border-primary pb-1"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-4 pr-4">
+                            <input 
+                              value={q.subject as string} 
+                              onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].subject = e.target.value; setAiGeneratedQuestions(copy); }} 
+                              className="w-24 bg-transparent text-gray-300 focus:outline-none focus:border-b focus:border-primary pb-1"
+                            />
+                          </td>
+                          <td className="py-4 pr-4">
+                            <select 
+                              value={q.difficulty as string} 
+                              onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].difficulty = e.target.value; setAiGeneratedQuestions(copy); }}
+                              className="bg-transparent text-gray-300 focus:outline-none"
+                            >
+                              <option>Easy</option>
+                              <option>Medium</option>
+                              <option>Hard</option>
+                            </select>
+                          </td>
+                          <td className="py-4 text-center">
+                            <select 
+                              value={q.correct_option as string} 
+                              onChange={e => { const copy = [...aiGeneratedQuestions]; copy[idx].correct_option = e.target.value; setAiGeneratedQuestions(copy); }}
+                              className="bg-transparent text-amber-400 font-bold focus:outline-none"
+                            >
+                              <option>A</option>
+                              <option>B</option>
+                              <option>C</option>
+                              <option>D</option>
+                            </select>
+                          </td>
+                          <td className="py-4 text-right">
+                            <button 
+                              onClick={() => { const copy = [...aiGeneratedQuestions]; copy.splice(idx, 1); setAiGeneratedQuestions(copy); }}
+                              className="p-1.5 text-red-400 hover:text-white hover:bg-red-500 rounded-md transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
