@@ -109,7 +109,6 @@ export default function AdminPage() {
       subject,
       topic,
       difficulty,
-      year,
       question_text: questionText,
       option_a: optionA,
       option_b: optionB,
@@ -656,7 +655,6 @@ export default function AdminPage() {
             </div>
           </div>
         )}
-      </div>
       
         {/* ================= SUBJECTS & TOPICS ================= */}
         {activeTab === "subjects" && (
@@ -727,7 +725,7 @@ export default function AdminPage() {
               ) : aiInputMode === "url" ? (
                 <input type="url" value={aiUrl} onChange={e => setAiUrl(e.target.value)} className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" placeholder="https://example.com/article" />
               ) : aiInputMode === "pdf" ? (
-                <input type="file" accept=".pdf" onChange={e => setAiPdfFile(e.target[0] || null)} className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" />
+                <input type="file" accept=".pdf" onChange={e => setAiPdfFile(e.target.files?.[0] || null)} className="w-full bg-background border border-white/10 rounded-lg p-4 text-white" />
               ) : (
                 <div className="p-4 border border-dashed border-white/10 rounded-lg text-center text-gray-400">Manual generation will rely entirely on the Subject and Topic configured below.</div>
               )}

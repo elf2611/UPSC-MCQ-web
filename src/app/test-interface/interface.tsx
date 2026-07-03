@@ -20,6 +20,7 @@ interface Question {
   correct_option: string;
   explanation?: string;
   subject?: string;
+  topic?: string;
   why_a_wrong?: string;
   why_b_wrong?: string;
   why_c_wrong?: string;

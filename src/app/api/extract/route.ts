@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
-import pdfParse from "pdf-parse";
+const pdfParse = require("pdf-parse");
 import * as cheerio from "cheerio";
 
 export async function POST(req: NextRequest) {

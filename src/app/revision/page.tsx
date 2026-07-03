@@ -184,12 +184,13 @@ export default function RevisionPage() {
     }).eq("id", item.id);
 
     // Update Profile XP
-    await supabase.rpc('increment_xp', { user_id: user.uid, xp_amount: earnedXp }).catch(() => {
+    const { error: rpcError } = await supabase.rpc('increment_xp', { user_id: user.uid, xp_amount: earnedXp });
+    if (rpcError) {
       // Fallback if RPC doesn't exist
       supabase.from("profiles").select("xp").eq("id", user.uid).single().then(({data}) => {
         if (data) supabase.from("profiles").update({ xp: data.xp + earnedXp }).eq("id", user.uid).then();
       });
-    });
+    }
 
     // Log Attempt
     const todayStr = new Date().toISOString().split("T")[0];
