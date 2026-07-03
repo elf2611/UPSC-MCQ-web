@@ -335,17 +335,33 @@ export default function AdminPage() {
         continue;
       }
       
-      const { why_a_wrong, why_b_wrong, why_c_wrong, why_d_wrong, ...rest } = q as Record<string, unknown>;
-      const toInsert = {
-        ...rest,
-        option_a_explanation: why_a_wrong,
-        option_b_explanation: why_b_wrong,
-        option_c_explanation: why_c_wrong,
-        option_d_explanation: why_d_wrong,
-      };
+      const toInsert = { ...q } as Record<string, unknown>;
+      
+      // Handle AI format which uses why_x_wrong instead of option_x_explanation
+      if (toInsert.why_a_wrong !== undefined) {
+        toInsert.option_a_explanation = toInsert.why_a_wrong;
+        delete toInsert.why_a_wrong;
+      }
+      if (toInsert.why_b_wrong !== undefined) {
+        toInsert.option_b_explanation = toInsert.why_b_wrong;
+        delete toInsert.why_b_wrong;
+      }
+      if (toInsert.why_c_wrong !== undefined) {
+        toInsert.option_c_explanation = toInsert.why_c_wrong;
+        delete toInsert.why_c_wrong;
+      }
+      if (toInsert.why_d_wrong !== undefined) {
+        toInsert.option_d_explanation = toInsert.why_d_wrong;
+        delete toInsert.why_d_wrong;
+      }
 
       const { error } = await supabase.from("questions").insert(toInsert);
-      if (error) failed++; else saved++;
+      if (error) {
+        console.error("Insert error for question:", q.question_text, error);
+        failed++;
+      } else {
+        saved++;
+      }
     }
 
     setAiSaveStats({ saved, skipped, failed, total: aiGeneratedQuestions.length });
