@@ -73,7 +73,6 @@ export default function AdminPage() {
   
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState<Record<string, unknown>[]>([]);
-  const [aiSaveStats, setAiSaveStats] = useState<Record<string, unknown> | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
@@ -147,7 +146,7 @@ export default function AdminPage() {
     };
 
     // First try with all fields
-    let finalData = { ...questionData, ...extendedData };
+    const finalData = { ...questionData, ...extendedData };
 
     let error;
     if (editingQuestion) {
@@ -343,7 +342,6 @@ export default function AdminPage() {
   const handleGenerateQuestions = async () => {
     if (!aiExtractedContext.trim()) return alert("No context to generate from.");
     setAiGenerating(true);
-    setAiSaveStats(null);
     try {
       const res = await fetch("/api/generate-questions", {
         method: "POST",
@@ -886,7 +884,6 @@ export default function AdminPage() {
                       setImportMethod(tab.id as "pdf" | "json" | "text");
                       setValidationErrors([]);
                       setAiGeneratedQuestions([]);
-                      setAiSaveStats(null);
                     }}
                     className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
                       importMethod === tab.id
