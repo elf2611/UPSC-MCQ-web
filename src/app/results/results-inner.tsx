@@ -46,9 +46,8 @@ interface AttemptAnswer {
 interface AttemptData {
   id: string;
   score: number;
-  total_questions: number;
-  attempted: number;
-  time_taken: number;
+  total_marks: number;
+  time_taken_seconds: number;
   mode: string;
 }
 
@@ -112,7 +111,7 @@ export default function ResultsInner() {
 
         if (attemptError || !attemptData) {
           console.error('Attempt fetch error:', attemptError);
-          setErrorMsg('Results not found. The test may not have saved correctly.');
+          setErrorMsg(attemptError?.message || 'Results not found. The test may not have saved correctly.');
           setLoading(false);
           return;
         }
@@ -184,9 +183,11 @@ export default function ResultsInner() {
   const incorrect = answers.filter(a => !a.is_correct && a.selected_option).length;
   const unattempted = answers.filter(a => !a.selected_option).length;
   const marked = answers.filter(a => a.is_marked).length;
-  const accuracy = d.attempted > 0 ? Math.round((correct / d.attempted) * 100) : 0;
-  const mins = Math.floor(d.time_taken / 60);
-  const secs = d.time_taken % 60;
+  const attemptedCount = correct + incorrect;
+  const accuracy = attemptedCount > 0 ? Math.round((correct / attemptedCount) * 100) : 0;
+  const timeTaken = d.time_taken_seconds || 0;
+  const mins = Math.floor(timeTaken / 60);
+  const secs = timeTaken % 60;
 
   const filteredAnswers = answers.filter(a => {
     if (filter === "correct") return a.is_correct;
@@ -277,7 +278,7 @@ export default function ResultsInner() {
       .map(([sub, stats]) => `${sub} ${Math.round((stats.c / stats.total) * 100)}%`)
       .join(", ");
 
-    const text = `I scored ${d.score.toFixed(1)}/${d.total_questions * 2} on a UPSC Prelims test on Prepwise!\nAccuracy: ${accuracy}% | Subject breakdown: ${breakdown}\nTry it free at prepwise.in`;
+    const text = `I scored ${d.score.toFixed(1)}/${d.total_marks || 0} on a UPSC Prelims test on Prepwise!\nAccuracy: ${accuracy}% | Subject breakdown: ${breakdown}\nTry it free at prepwise.in`;
     
     try {
       await navigator.clipboard.writeText(text);
@@ -339,7 +340,7 @@ export default function ResultsInner() {
               <div className="text-center p-4 bg-background rounded-xl border border-white/5">
                 <p className="text-xs text-gray-500 mb-1">Total Score</p>
                 <p className="text-3xl font-extrabold text-primary">{d.score.toFixed(1)}</p>
-                <p className="text-xs text-gray-600">/ {d.total_questions * 2}</p>
+                <p className="text-xs text-gray-600">/ {d.total_marks || 0}</p>
               </div>
               <div className="text-center p-4 bg-background rounded-xl border border-white/5">
                 <p className="text-xs text-gray-500 mb-1">Correct</p>
@@ -539,7 +540,7 @@ export default function ResultsInner() {
         <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 mt-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div>
             <h3 className="text-white font-bold text-lg mb-1">{d.mode === "mock" ? "Mock Test" : "Practice Session"} Result</h3>
-            <p className="text-gray-400 text-sm">Score: {d.score.toFixed(1)}/{d.total_questions * 2} • Accuracy: {accuracy}%</p>
+            <p className="text-gray-400 text-sm">Score: {d.score.toFixed(1)}/{d.total_marks || 0} • Accuracy: {accuracy}%</p>
           </div>
           <button onClick={handleShare} className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 text-white rounded-lg hover:bg-white/10 transition-colors font-medium whitespace-nowrap">
             {copied ? <span className="text-green-400">Copied! ✓</span> : <><Copy className="w-4 h-4"/> 📋 Copy Result</>}
