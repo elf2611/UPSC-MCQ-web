@@ -515,7 +515,7 @@ export default function TestInterfaceInner() {
                   <div className={`p-4 rounded-xl border ${isCorrect ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
                     <div className={`flex items-center gap-2 font-bold mb-2 ${isCorrect ? "text-green-400" : "text-red-400"}`}>
                       {isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-                      {isCorrect ? "Correct!" : `Wrong. The correct answer was ${currentQ.correct_option}`}
+                      {isCorrect ? "Correct!" : `Incorrect. The correct answer was ${currentQ.correct_option}`}
                     </div>
                     {currentQ.explanation && (
                       <p className="text-gray-300 text-sm leading-relaxed">{currentQ.explanation}</p>
@@ -525,7 +525,7 @@ export default function TestInterfaceInner() {
                   {/* Panel 2: Why Wrong Options Fail */}
                   {(currentQ.why_a_wrong || currentQ.why_b_wrong || currentQ.why_c_wrong || currentQ.why_d_wrong) && (
                     <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-                      <h4 className="text-sm font-semibold text-white mb-3">Why the wrong options fail</h4>
+                      <h4 className="text-sm font-semibold text-white mb-3">Why the incorrect options fail</h4>
                       <div className="space-y-3">
                         {['A','B','C','D'].map(opt => {
                           const wrongReason = currentQ[`why_${opt.toLowerCase()}_wrong` as keyof Question] as string;

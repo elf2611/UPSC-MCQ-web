@@ -100,7 +100,6 @@ export default function ResultsInner() {
         )
       
       case 'Incorrect':
-      case 'Wrong':
         return answers.filter(ans => 
           ans.selected_option !== null && 
           ans.selected_option !== undefined &&
@@ -383,7 +382,7 @@ export default function ResultsInner() {
                   <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px', color: '#fff' }} />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="correct" fill="#22c55e" radius={[4,4,0,0]} name="Correct" />
-                  <Bar dataKey="wrong" fill="#ef4444" radius={[4,4,0,0]} name="Wrong" />
+                  <Bar dataKey="wrong" fill="#ef4444" radius={[4,4,0,0]} name="Incorrect" />
                   <Bar dataKey="skipped" fill="#52525b" radius={[4,4,0,0]} name="Skipped" />
                 </BarChart>
               </ResponsiveContainer>
@@ -494,7 +493,7 @@ export default function ResultsInner() {
                         {/* Why wrong */}
                         {['a','b','c','d'].some(opt => opt !== ans.questions?.correct_option?.toLowerCase() && ans.questions?.[`why_${opt}_wrong` as keyof Question]) && (
                           <div className="bg-red-950/20 rounded-xl p-4 border border-red-900/30">
-                            <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">❌ Why wrong options fail</p>
+                            <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">❌ Why incorrect options fail</p>
                             <div className="space-y-2">
                               {['a','b','c','d'].map(opt => {
                                 if (opt === ans.questions?.correct_option?.toLowerCase()) return null;
