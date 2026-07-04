@@ -161,6 +161,7 @@ export default function TestInterfaceInner() {
       }
     });
     score = Math.round(score * 100) / 100;
+    const attemptedCount = Object.keys(answers).length;
     const unattempted = questions.length - attemptedCount;
     // Calculate total marks (assume 2 marks per question)
     const totalMarks = questions.length * 2;
