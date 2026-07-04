@@ -88,6 +88,38 @@ export default function ResultsInner() {
   const [filter, setFilter] = useState<FilterType>("All");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  
+  // Filtering
+  const filteredAnswers = useMemo(() => {
+    if (!answers || answers.length === 0) return []
+    
+    switch (filter) {
+      case 'Correct':
+        return answers.filter(ans => 
+          ans.is_correct === true
+        )
+      
+      case 'Incorrect':
+      case 'Wrong':
+        return answers.filter(ans => 
+          ans.selected_option !== null && 
+          ans.selected_option !== undefined &&
+          ans.selected_option !== '' &&
+          ans.is_correct !== true
+        )
+      
+      case 'Skipped':
+        return answers.filter(ans => 
+          !ans.selected_option || 
+          ans.selected_option === null ||
+          ans.selected_option === ''
+        )
+      
+      case 'All':
+      default:
+        return answers
+    }
+  }, [answers, filter]);
 
   useEffect(() => {
     const load = async () => {
@@ -249,36 +281,7 @@ export default function ResultsInner() {
     skipped: data.unattempted,
   }));
 
-  // Filtering
-  const filteredAnswers = useMemo(() => {
-    if (!answers || answers.length === 0) return []
-    
-    switch (filter) {
-      case 'Correct':
-        return answers.filter(ans => 
-          ans.is_correct === true
-        )
-      
-      case 'Incorrect':
-        return answers.filter(ans => 
-          ans.selected_option !== null && 
-          ans.selected_option !== undefined &&
-          ans.selected_option !== '' &&
-          ans.is_correct !== true
-        )
-      
-      case 'Skipped':
-        return answers.filter(ans => 
-          !ans.selected_option || 
-          ans.selected_option === null ||
-          ans.selected_option === ''
-        )
-      
-      case 'All':
-      default:
-        return answers
-    }
-  }, [answers, filter]);
+  // (moved filteredAnswers hook up to avoid conditional hook call)
 
   return (
     <ProtectedRoute>
