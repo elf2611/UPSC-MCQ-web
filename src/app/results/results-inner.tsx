@@ -38,7 +38,7 @@ interface AttemptAnswer {
   selected_option: string | null;
   is_correct: boolean;
   is_marked?: boolean;
-  questions?: Question;
+  questions?: any;
 }
 
 interface AttemptData {
@@ -114,6 +114,7 @@ export default function ResultsInner() {
           .from("attempt_answers")
           .select(`
             id,
+            question_id,
             selected_option,
             is_correct,
             marked_for_review,
