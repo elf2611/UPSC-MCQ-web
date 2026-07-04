@@ -190,38 +190,8 @@ export default function TestInterfaceInner() {
         throw new Error('User not authenticated. Please log in again.');
       }
 
-      // 2. Save test_attempt
-      const { data: attemptData, error: attemptError } = await supabase
-        .from("test_attempts")
-        .insert({
-          user_id: user.uid,
-          test_id: testId || null,
-          mode,
-          score,
-          total_marks: totalMarks,
-          correct_count: correctCount,
-          wrong_count: wrongCount,
-          unattempted_count: unattempted,
-          accuracy_percent: accuracy,
-          time_taken_seconds: timeTaken,
-          started_at: new Date(Date.now() - timeTaken * 1000).toISOString(),
-          submitted_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-
-      console.log('Attempt save result:', attemptData, attemptError);
-
-      if (attemptError || !attemptData) {
-        throw new Error('Failed to save attempt: ' + (attemptError?.message || 'No data returned'));
-      }
-
-      const attemptId = attemptData.id;
-      console.log('Attempt ID:', attemptId);
-
-      // 3. Save attempt_answers
+      // 2. Save via server route (uses service role key, bypasses schema cache + RLS)
       const answerRows = questions.map(q => ({
-        attempt_id: attemptId,
         question_id: q.id,
         selected_option: answers[q.id] || null,
         is_correct: answers[q.id] ? answers[q.id] === q.correct_option : false,
@@ -229,14 +199,34 @@ export default function TestInterfaceInner() {
         marked_for_review: questionStatus[q.id] === 'marked-for-review' || questionStatus[q.id] === 'answered-and-marked',
       }));
 
-      const { error: answersError } = await supabase
-        .from('attempt_answers')
-        .insert(answerRows);
+      const response = await fetch('/api/submit-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          testId: testId || null,
+          mode,
+          score,
+          totalMarks,
+          correctCount,
+          wrongCount,
+          unattemptedCount: unattempted,
+          accuracyPercent: accuracy,
+          timeTakenSeconds: timeTaken,
+          startedAt: new Date(Date.now() - timeTaken * 1000).toISOString(),
+          answerRows,
+        }),
+      });
 
-      if (answersError) {
-        // Log but don't block redirect
-        console.error('Answers save error (non-fatal):', answersError);
+      const result = await response.json();
+      console.log('submit-test response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Server error saving attempt');
       }
+
+      const attemptId = result.attemptId;
+      console.log('Attempt ID:', attemptId);
 
       // 4. Update user_statistics per subject (non-fatal)
       const subjectStats: Record<string, {correct: number, attempted: number}> = {};
