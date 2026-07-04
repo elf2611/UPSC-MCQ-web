@@ -364,82 +364,65 @@ export default function AdminPage() {
     setSaveProgress(0)
     setErrorStr("")
     setSuccessMessage("")
-    const errors: string[] = []
-    let saved = 0
-    let schemaLimited = false // tracks if we fell back to core-only insert
 
-    for (let i = 0; i < aiGeneratedQuestions.length; i++) {
-      const q = aiGeneratedQuestions[i] as any
+    try {
+      // Add debug log to see what we're sending
+      console.log('[handleBulkSave] Sending questions to API:', 
+        JSON.stringify(aiGeneratedQuestions, null, 2))
 
-      // Validate required fields
-      if (!q.question_text || !q.option_a || !q.option_b || !q.option_c || !q.option_d) {
-        errors.push(`Question ${i + 1}: Missing required fields (question_text, options)`)
-        setSaveProgress(Math.round(((i + 1) / aiGeneratedQuestions.length) * 100))
-        continue
+      const response = await fetch('/api/admin/save-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questions: aiGeneratedQuestions,
+          userId: null, // service role handles auth bypass
+        }),
+      })
+
+      // Check content type before parsing
+      const contentType = response.headers.get('content-type')
+      if (!contentType?.includes('application/json')) {
+        const rawText = await response.text()
+        console.error('[handleBulkSave] Non-JSON response:', rawText)
+        setErrorStr(`Server returned an unexpected response (${response.status}). Check that SUPABASE_SERVICE_ROLE_KEY is set in .env.local and Vercel.`)
+        return
       }
 
-      // CORE row — always works
-      const coreRow = {
-        question_text: String(q.question_text).trim(),
-        option_a: String(q.option_a).trim(),
-        option_b: String(q.option_b).trim(),
-        option_c: String(q.option_c).trim(),
-        option_d: String(q.option_d).trim(),
-        correct_option: String(q.correct_option || 'a').toLowerCase().trim(),
-        explanation: String(q.explanation || '').trim(),
-        difficulty: String(q.difficulty || 'medium').toLowerCase().trim(),
-        subject: String(q.subject || 'General').trim(),
-        topic: String(q.topic || '').trim(),
+      const result = await response.json()
+      console.log('[handleBulkSave] API response:', result)
+
+      if (!response.ok) {
+        setErrorStr(result.error || 'Save failed — check Vercel/server logs.')
+        return
       }
 
-      // EXTENDED row — requires running supabase_setup.sql
-      const fullRow = {
-        ...coreRow,
-        option_a_explanation: String(q.why_a_wrong || q.option_a_explanation || '').trim(),
-        option_b_explanation: String(q.why_b_wrong || q.option_b_explanation || '').trim(),
-        option_c_explanation: String(q.why_c_wrong || q.option_c_explanation || '').trim(),
-        option_d_explanation: String(q.why_d_wrong || q.option_d_explanation || '').trim(),
-        elimination_tip: String(q.elimination_tip || '').trim(),
-        static_topic_link: String(q.static_topic_link || '').trim(),
-        source: String(q.source || 'original'),
-        year: q.year || null,
-        tags: Array.isArray(q.tags) ? q.tags : [],
-        language: String(q.language || 'en'),
+      setSaveProgress(100)
+
+      if (result.saved > 0) {
+        setSuccessMessage(`✅ ${result.saved} question${result.saved > 1 ? 's' : ''} saved to database!`)
+        setAiGeneratedQuestions([])
+        setJsonText('')
       }
 
-      // Try full insert first
-      let { error } = await supabase.from('questions').insert(fullRow)
-
-      // If schema error, fall back to core-only
-      if (error?.message?.includes('column')) {
-        schemaLimited = true
-        const { error: coreError } = await supabase.from('questions').insert(coreRow)
-        error = coreError
+      if (result.failed > 0) {
+        setErrorStr(
+          `${result.failed} question${result.failed > 1 ? 's' : ''} failed:\n` +
+          (result.errors || []).join('\n')
+        )
       }
 
-      if (error) {
-        console.error(`Q${i+1} error:`, error.message)
-        errors.push(`Question ${i + 1}: ${error.message}`)
-      } else {
-        saved++
+      if (result.saved === 0 && result.failed === 0) {
+        setErrorStr('No questions were processed. Check that your JSON has valid question_text, option_a–d, and correct_option fields.')
       }
 
-      setSaveProgress(Math.round(((i + 1) / aiGeneratedQuestions.length) * 100))
-    }
-
-    setSaving(false)
-
-    if (errors.length > 0) {
-      setErrorStr(`Saved ${saved}/${aiGeneratedQuestions.length}. Errors:\n${errors.join('\n')}`)
-    }
-
-    if (saved > 0) {
-      const note = schemaLimited ? ' (Run supabase_setup.sql to save explanations & tags too)' : ''
-      setSuccessMessage(`✅ ${saved} question${saved > 1 ? 's' : ''} saved!${note}`)
-      setAiGeneratedQuestions([])
-      setJsonText('')
+    } catch (err) {
+      console.error('[handleBulkSave] Network/fetch error:', err)
+      setErrorStr('Network error: ' + String(err))
+    } finally {
+      setSaving(false)
     }
   };
+
 
   const filteredQuestions = questions.filter(q => 
     (q.question_text as string)?.toLowerCase().includes(search.toLowerCase()) ||
