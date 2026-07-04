@@ -166,7 +166,9 @@ export default function TestInterfaceInner() {
       questions.forEach(q => {
         const ans = answers[q.id];
         if (ans) {
-          if (ans === q.correct_option) {
+          const userAnsLower = ans.toLowerCase().trim();
+          const correctAnsLower = q.correct_option?.toLowerCase().trim();
+          if (userAnsLower === correctAnsLower) {
             score += 2;
             correctCount++;
           } else {
@@ -194,7 +196,7 @@ export default function TestInterfaceInner() {
       const answerRows = questions.map(q => ({
         question_id: q.id,
         selected_option: answers[q.id] || null,
-        is_correct: answers[q.id] ? answers[q.id] === q.correct_option : false,
+        is_correct: answers[q.id] ? answers[q.id].toLowerCase().trim() === q.correct_option?.toLowerCase().trim() : false,
         time_spent_seconds: 0,
         marked_for_review: questionStatus[q.id] === 'marked-for-review' || questionStatus[q.id] === 'answered-and-marked',
       }));
@@ -235,7 +237,8 @@ export default function TestInterfaceInner() {
         if (!subjectStats[subjectId]) subjectStats[subjectId] = { correct: 0, attempted: 0 };
         if (answers[q.id]) {
           subjectStats[subjectId].attempted++;
-          if (answers[q.id] === q.correct_option) subjectStats[subjectId].correct++;
+          const isCorrect = answers[q.id].toLowerCase().trim() === q.correct_option?.toLowerCase().trim();
+          if (isCorrect) subjectStats[subjectId].correct++;
         }
       });
 
@@ -306,7 +309,7 @@ export default function TestInterfaceInner() {
 
   const handleSelectOption = (option: string) => {
     if (!currentQ || feedbackMode) return;
-    setAnswers(prev => ({ ...prev, [currentQ.id]: option }));
+    setAnswers(prev => ({ ...prev, [currentQ.id]: option.toLowerCase().trim() }));
     setQuestionStatus(prev => {
       const cur = prev[currentQ.id];
       return { ...prev, [currentQ.id]: cur === "marked-for-review" ? "answered-and-marked" : "answered" };
@@ -368,7 +371,7 @@ export default function TestInterfaceInner() {
   const handleConfidenceSelect = async (level: "easy" | "got_it" | "tricky") => {
     if (!currentQ || !user) return;
 
-    const isCorrect = answers[currentQ.id] === currentQ.correct_option;
+    const isCorrect = answers[currentQ.id]?.toLowerCase().trim() === currentQ.correct_option?.toLowerCase().trim();
     
     if (level !== "easy") {
       const isTricky = level === "tricky" || !isCorrect;
@@ -407,7 +410,7 @@ export default function TestInterfaceInner() {
     );
   }
 
-  const isCorrect = currentQ ? answers[currentQ.id] === currentQ.correct_option : false;
+  const isCorrect = currentQ ? answers[currentQ.id]?.toLowerCase().trim() === currentQ.correct_option?.toLowerCase().trim() : false;
 
   return (
     <div className="h-screen bg-[#121212] flex flex-col overflow-hidden relative">

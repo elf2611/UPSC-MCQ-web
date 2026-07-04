@@ -9,10 +9,7 @@ import {
   ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
 } from "recharts";
-import {
-  CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp,
-  ArrowRight, Clock, RotateCcw, Bookmark, Copy
-} from "lucide-react";
+import { XCircle } from "lucide-react";
 import Link from "next/link";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -36,6 +33,7 @@ interface Question {
 }
 
 interface AttemptAnswer {
+  id: string;
   question_id: string;
   selected_option: string | null;
   is_correct: boolean;
@@ -49,29 +47,30 @@ interface AttemptData {
   total_marks: number;
   time_taken_seconds: number;
   mode: string;
+  submitted_at: string;
 }
 
+type FilterType = "All" | "Correct" | "Incorrect" | "Skipped";
 
+// ── Utils ──────────────────────────────────────────────────────────────────
+const formatTime = (seconds: number) => {
+  if (!seconds || seconds <= 0) return '0m 0s';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs}s`;
+};
 
-
-// ── Circular Progress Ring ─────────────────────────────────────────────────
-function CircleRing({ pct, size = 120, stroke = 10, color = "#ffbf00" }: { pct: number; size?: number; stroke?: number; color?: string }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (pct / 100) * circ;
-  return (
-    <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#2a2a2a" strokeWidth={stroke} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke={color} strokeWidth={stroke}
-        strokeDasharray={circ} strokeDashoffset={offset}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dashoffset 0.8s ease" }}
-      />
-    </svg>
-  );
-}
+const format = (dateString: string) => {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit'
+    }).format(new Date(dateString));
+  } catch {
+    return dateString;
+  }
+};
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function ResultsInner() {
@@ -82,16 +81,9 @@ export default function ResultsInner() {
 
   const [attempt, setAttempt] = useState<AttemptData | null>(null);
   const [answers, setAnswers] = useState<AttemptAnswer[]>([]);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [filter, setFilter] = useState<FilterType>("All");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-  
-  // New States
-  const [queueing, setQueueing] = useState(false);
-  const [queueAdded, setQueueAdded] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [toastMsg, setToastMsg] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -121,7 +113,10 @@ export default function ResultsInner() {
         const { data: answersData, error: answersError } = await supabase
           .from("attempt_answers")
           .select(`
-            *,
+            id,
+            selected_option,
+            is_correct,
+            marked_for_review,
             questions (
               id,
               question_text,
@@ -138,8 +133,7 @@ export default function ResultsInner() {
               elimination_tip,
               static_topic_link,
               subject,
-              topic,
-              difficulty
+              topic
             )
           `)
           .eq("attempt_id", attemptId);
@@ -161,7 +155,7 @@ export default function ResultsInner() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#121212]">
-      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -171,389 +165,300 @@ export default function ResultsInner() {
         <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
         <h2 className="text-xl font-bold text-white mb-2">Error Loading Results</h2>
         <p className="text-gray-400 mb-6">{errorMsg || 'Could not load the results for this test.'}</p>
-        <Link href="/" className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
+        <Link href="/" className="inline-block bg-amber-500 text-black px-6 py-3 rounded-lg font-bold hover:bg-amber-400 transition-colors">
           Go to Dashboard
         </Link>
       </div>
     </div>
   );
 
-  const d = attempt;
-  const correct = answers.filter(a => a.is_correct).length;
-  const incorrect = answers.filter(a => !a.is_correct && a.selected_option).length;
-  const unattempted = answers.filter(a => !a.selected_option).length;
-  const marked = answers.filter(a => a.is_marked).length;
-  const attemptedCount = correct + incorrect;
-  const accuracy = attemptedCount > 0 ? Math.round((correct / attemptedCount) * 100) : 0;
-  const timeTaken = d.time_taken_seconds || 0;
-  const mins = Math.floor(timeTaken / 60);
-  const secs = timeTaken % 60;
+  // Stats calculation
+  let correct = 0;
+  let wrong = 0;
+  let unattempted = 0;
 
+  answers.forEach(a => {
+    if (!a.selected_option) unattempted++;
+    else if (a.is_correct) correct++;
+    else wrong++;
+  });
+
+  const attemptedCount = correct + wrong;
+  const accuracy = attemptedCount > 0 ? Math.round((correct / attemptedCount) * 100) : 0;
+  const score = attempt.score;
+  const totalMarks = attempt.total_marks || (answers.length * 2);
+
+  // Subject Breakdown
+  const subjectBreakdown: Record<string, { correct: number; wrong: number; unattempted: number; total: number }> = {};
+  
+  answers.forEach(ans => {
+    const subject = ans.questions?.subject || 'Unknown';
+    if (!subjectBreakdown[subject]) {
+      subjectBreakdown[subject] = { correct: 0, wrong: 0, unattempted: 0, total: 0 };
+    }
+    subjectBreakdown[subject].total++;
+    
+    if (!ans.selected_option) {
+      subjectBreakdown[subject].unattempted++;
+    } else if (ans.is_correct) {
+      subjectBreakdown[subject].correct++;
+    } else {
+      subjectBreakdown[subject].wrong++;
+    }
+  });
+
+  const chartData = Object.entries(subjectBreakdown).map(([subject, data]) => ({
+    subject: subject.substring(0, 10), // truncate for chart
+    correct: data.correct,
+    wrong: data.wrong,
+    skipped: data.unattempted,
+  }));
+
+  // Filtering
   const filteredAnswers = answers.filter(a => {
-    if (filter === "correct") return a.is_correct;
-    if (filter === "incorrect") return !a.is_correct && a.selected_option;
-    if (filter === "unattempted") return !a.selected_option;
-    if (filter === "marked") return a.is_marked;
+    if (filter === "Correct") return a.is_correct;
+    if (filter === "Incorrect") return !a.is_correct && a.selected_option;
+    if (filter === "Skipped") return !a.selected_option;
     return true;
   });
 
-  type FilterType = "all" | "correct" | "incorrect" | "unattempted" | "marked";
-
-  const subjectStats: Record<string, { correct: number, incorrect: number, skipped: number, total: number }> = {};
-  answers.forEach(a => {
-    const sub = a.questions?.subject;
-    if (sub) {
-      if (!subjectStats[sub]) subjectStats[sub] = { correct: 0, incorrect: 0, skipped: 0, total: 0 };
-      subjectStats[sub].total++;
-      if (a.is_correct) {
-        subjectStats[sub].correct++;
-      } else if (a.selected_option) {
-        subjectStats[sub].incorrect++;
-      } else {
-        subjectStats[sub].skipped++;
-      }
-    }
-  });
-
-  const SUBJECT_DATA = Object.entries(subjectStats).map(([subject, stats]) => ({
-    subject,
-    correct: stats.correct,
-    incorrect: stats.incorrect,
-    skipped: stats.skipped,
-    accuracy: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0
-  }));
-
-  const FILTER_CHIPS: { key: FilterType; label: string; count: number; color: string }[] = [
-    { key: "all", label: "All", count: answers.length, color: "bg-white/10 text-white border-white/20" },
-    { key: "correct", label: "Correct", count: correct, color: "bg-green-500/10 text-green-400 border-green-500/20" },
-    { key: "incorrect", label: "Incorrect", count: incorrect, color: "bg-red-500/10 text-red-400 border-red-500/20" },
-    { key: "unattempted", label: "Unattempted", count: unattempted, color: "bg-gray-500/10 text-gray-400 border-gray-500/20" },
-    { key: "marked", label: "Marked", count: marked, color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
-  ];
-
-  const handleAddToRevisionQueue = async () => {
-    if (!user) return;
-    setQueueing(true);
-    const incorrectIds = answers.filter(a => !a.is_correct).map(a => a.question_id);
-    
-    if (incorrectIds.length > 0) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const nextReviewStr = tomorrow.toISOString().split("T")[0];
-
-      const upserts = incorrectIds.map(id => ({
-        user_id: user.uid,
-        question_id: id,
-        interval_days: 1,
-        next_review_date: nextReviewStr
-      }));
-      
-      const { error } = await supabase.from("revision_queue").upsert(upserts, { onConflict: "user_id, question_id" });
-      
-      if (!error) {
-        setQueueAdded(true);
-        setToastMsg(`${incorrectIds.length} questions added to your revision queue`);
-        setTimeout(() => setToastMsg(""), 3000);
-      } else {
-        console.error("Queue add error:", error);
-      }
-    } else {
-      setQueueAdded(true); 
-    }
-    setQueueing(false);
-  };
-
-  const handleShare = async () => {
-    const subStats: Record<string, {c: number, total: number}> = {};
-    answers.forEach(a => {
-      const sub = a.questions?.subject;
-      if (sub) {
-        if (!subStats[sub]) subStats[sub] = {c: 0, total: 0};
-        subStats[sub].total++;
-        if (a.is_correct) subStats[sub].c++;
-      }
-    });
-    
-    const breakdown = Object.entries(subStats)
-      .map(([sub, stats]) => `${sub} ${Math.round((stats.c / stats.total) * 100)}%`)
-      .join(", ");
-
-    const text = `I scored ${d.score.toFixed(1)}/${d.total_marks || 0} on a UPSC Prelims test on Prepwise!\nAccuracy: ${accuracy}% | Subject breakdown: ${breakdown}\nTry it free at prepwise.in`;
-    
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#121212]">
-      <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-
   return (
     <ProtectedRoute>
-      <div className="max-w-6xl mx-auto px-4 py-8 relative">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+      <div className="min-h-screen bg-black text-zinc-300 pb-20">
+        {/* ── TOP HEADER ── */}
+        <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Test Analysis</h1>
-            <p className="text-gray-400 mt-1">Detailed breakdown of your performance.</p>
+            <h1 className="text-white font-semibold text-xl">Test Results</h1>
+            <p className="text-zinc-400 text-sm mt-1">Submitted on {format(attempt.submitted_at)}</p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleAddToRevisionQueue}
-              disabled={queueAdded || queueing}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
-                queueAdded ? "bg-green-500/20 text-green-400 border border-green-500/30" : 
-                "bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30"
-              }`}
-            >
-              <Bookmark className="w-4 h-4" />
-              {queueing ? "Adding..." : queueAdded ? "✓ Added to Queue" : "📚 Add wrong answers to Revision Queue"}
+          <div className="flex gap-3 w-full sm:w-auto">
+            <button onClick={() => router.push('/practice-tests')}
+              className="flex-1 sm:flex-none px-4 py-2 rounded-lg border border-zinc-700 text-zinc-300 text-sm font-medium hover:bg-zinc-800 transition-colors">
+              Practice Again
             </button>
-            <Link href="/mock-tests" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-white/10 px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">
-              Back to Tests <ArrowRight className="w-4 h-4" />
-            </Link>
+            <button onClick={() => router.push('/performance')}
+              className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-amber-500 text-black text-sm font-medium hover:bg-amber-400 transition-colors">
+              View Performance →
+            </button>
           </div>
         </div>
 
-        {/* ── Score Card ─────────────────────────────────────────────────────── */}
-        <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 lg:p-8 mb-8">
-          <div className="flex flex-col lg:flex-row items-center gap-8">
-            {/* Ring */}
-            <div className="relative flex-shrink-0">
-              <CircleRing pct={accuracy} size={140} stroke={12} />
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-extrabold text-primary">{accuracy}%</span>
-                <span className="text-xs text-gray-500">Accuracy</span>
+        {/* ── SCORE HERO SECTION ── */}
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 lg:p-6">
+            
+            {/* Big score card - takes 2 cols */}
+            <div className="lg:col-span-2 bg-zinc-900 rounded-2xl p-6 border border-zinc-800 flex flex-col items-center justify-center text-center">
+              {/* Circular score ring */}
+              <div className="relative w-36 h-36 mb-4">
+                <svg className="w-36 h-36 -rotate-90" viewBox="0 0 144 144">
+                  <circle cx="72" cy="72" r="60" fill="none" stroke="#27272a" strokeWidth="12" />
+                  <circle cx="72" cy="72" r="60"
+                    fill="none" 
+                    stroke={accuracy >= 60 ? "#f59e0b" : "#ef4444"}
+                    strokeWidth="12"
+                    strokeDasharray={`${2 * Math.PI * 60}`}
+                    strokeDashoffset={`${2 * Math.PI * 60 * (1 - accuracy/100)}`}
+                    strokeLinecap="round"
+                    className="transition-all duration-1000" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-amber-400">{accuracy}%</span>
+                  <span className="text-zinc-400 text-xs mt-1">Accuracy</span>
+                </div>
               </div>
+              <div className="text-4xl font-bold text-white mb-1">
+                {score.toFixed(1)}
+                <span className="text-xl text-zinc-400 font-normal ml-1">/ {totalMarks}</span>
+              </div>
+              <p className="text-zinc-400 text-sm">Total Score</p>
             </div>
 
-            {/* Stats */}
-            <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
-              <div className="text-center p-4 bg-background rounded-xl border border-white/5">
-                <p className="text-xs text-gray-500 mb-1">Total Score</p>
-                <p className="text-3xl font-extrabold text-primary">{d.score.toFixed(1)}</p>
-                <p className="text-xs text-gray-600">/ {d.total_marks || 0}</p>
+            {/* Stats grid - takes 3 cols */}
+            <div className="lg:col-span-3 grid grid-cols-2 gap-4">
+              {/* Correct */}
+              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-green-500 flex flex-col justify-center">
+                <div className="text-3xl font-bold text-green-400 mb-1">{correct}</div>
+                <div className="text-zinc-400 text-sm font-medium">Correct</div>
+                <div className="text-green-500 text-xs mt-1 font-medium">+{(correct * 2).toFixed(2)} marks</div>
               </div>
-              <div className="text-center p-4 bg-background rounded-xl border border-white/5">
-                <p className="text-xs text-gray-500 mb-1">Correct</p>
-                <p className="text-3xl font-extrabold text-green-400">{correct}</p>
-                <p className="text-xs text-gray-600">+{correct * 2} marks</p>
+
+              {/* Wrong */}
+              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-red-500 flex flex-col justify-center">
+                <div className="text-3xl font-bold text-red-400 mb-1">{wrong}</div>
+                <div className="text-zinc-400 text-sm font-medium">Incorrect</div>
+                <div className="text-red-500 text-xs mt-1 font-medium">-{(wrong * (2/3)).toFixed(2)} marks</div>
               </div>
-              <div className="text-center p-4 bg-background rounded-xl border border-white/5">
-                <p className="text-xs text-gray-500 mb-1">Incorrect</p>
-                <p className="text-3xl font-extrabold text-red-400">{incorrect}</p>
-                <p className="text-xs text-gray-600">−{(incorrect * 0.66).toFixed(2)} marks</p>
+
+              {/* Skipped */}
+              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-zinc-500 flex flex-col justify-center">
+                <div className="text-3xl font-bold text-zinc-300 mb-1">{unattempted}</div>
+                <div className="text-zinc-400 text-sm font-medium">Skipped</div>
+                <div className="text-zinc-500 text-xs mt-1 font-medium">0 marks</div>
               </div>
-              <div className="text-center p-4 bg-background rounded-xl border border-white/5">
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <Clock className="w-3.5 h-3.5 text-gray-500" />
-                  <p className="text-xs text-gray-500">Time Taken</p>
+
+              {/* Time */}
+              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-blue-500 flex flex-col justify-center">
+                <div className="text-3xl font-bold text-blue-400 mb-1">
+                  {formatTime(attempt.time_taken_seconds)}
                 </div>
-                <p className="text-3xl font-extrabold text-white">{mins}<span className="text-lg">m</span></p>
-                <p className="text-xs text-gray-600">{secs}s remaining</p>
+                <div className="text-zinc-400 text-sm font-medium">Time Taken</div>
+                <div className="text-blue-500 text-xs mt-1 font-medium">
+                  ~{Math.round((attempt.time_taken_seconds || 0) / (correct + wrong + unattempted || 1))}s per question
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* ── Subject-wise Bar Chart ─────────────────────────────────────────── */}
-        <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 mb-8">
-          <h3 className="text-white font-semibold mb-6">Subject-wise Breakdown</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={SUBJECT_DATA} barSize={10} barGap={3}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2a2a2a" />
-                <XAxis dataKey="subject" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: "#1a1a1a", borderColor: "#374151", color: "#fff", borderRadius: "8px" }} />
-                <Legend wrapperStyle={{ color: "#9ca3af", fontSize: 12 }} />
-                <Bar dataKey="correct" fill="#10b981" name="Correct" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="incorrect" fill="#ef4444" name="Incorrect" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="skipped" fill="#374151" name="Skipped" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* ── SUBJECT BREAKDOWN CHART ── */}
+          <div className="mx-4 lg:mx-6 mb-6 bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+            <h2 className="text-white font-semibold mb-6">Subject-wise Breakdown</h2>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={chartData} barSize={20} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                  <XAxis dataKey="subject" tick={{ fill: '#a1a1aa', fontSize: 12 }} axisLine={false} tickLine={false} tickMargin={15} />
+                  <YAxis tick={{ fill: '#a1a1aa', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px', color: '#fff' }} />
+                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                  <Bar dataKey="correct" fill="#22c55e" radius={[4,4,0,0]} name="Correct" />
+                  <Bar dataKey="wrong" fill="#ef4444" radius={[4,4,0,0]} name="Wrong" />
+                  <Bar dataKey="skipped" fill="#52525b" radius={[4,4,0,0]} name="Skipped" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-zinc-500 text-center py-8">No subject data available</p>
+            )}
           </div>
 
-          {/* Accuracy progress bars */}
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {SUBJECT_DATA.map(s => (
-              <div key={s.subject}>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-gray-400 font-medium">{s.subject}</span>
-                  <span className={s.accuracy >= 70 ? "text-green-400" : s.accuracy >= 50 ? "text-amber-400" : "text-red-400"}>{s.accuracy}%</span>
-                </div>
-                <div className="h-1.5 bg-background rounded-full overflow-hidden border border-white/5">
-                  <div className={`h-full rounded-full transition-all duration-700 ${s.accuracy >= 70 ? "bg-green-500" : s.accuracy >= 50 ? "bg-amber-400" : "bg-red-500"}`} style={{ width: `${s.accuracy}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Question Review ────────────────────────────────────────────────── */}
-        <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 mb-8">
-          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <h3 className="text-white font-semibold">Question Review</h3>
-            <div className="flex flex-wrap gap-2">
-              {FILTER_CHIPS.map(chip => (
-                <button
-                  key={chip.key}
-                  onClick={() => setFilter(chip.key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filter === chip.key ? chip.color + " ring-2 ring-offset-1 ring-offset-[#1a1a1a] ring-current" : "bg-white/5 text-gray-500 border-white/10 hover:border-white/20"}`}
-                >
-                  {chip.label} <span className="ml-1 opacity-70">({chip.count})</span>
+          {/* ── QUESTION REVIEW ── */}
+          <div className="mx-4 lg:mx-6 mb-6 bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+            
+            {/* Filter chips */}
+            <div className="flex flex-wrap items-center gap-2 p-4 border-b border-zinc-800 bg-zinc-900/50">
+              <span className="text-white font-semibold mr-2">Question Review</span>
+              {(['All', 'Correct', 'Incorrect', 'Skipped'] as FilterType[]).map(f => (
+                <button key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    filter === f
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                  }`}>
+                  {f} {f === 'All' ? `(${answers.length})` : f === 'Correct' ? `(${correct})` : f === 'Incorrect' ? `(${wrong})` : `(${unattempted})`}
                 </button>
               ))}
             </div>
-          </div>
 
-          <div className="space-y-3">
-            {filteredAnswers.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No questions match this filter.</p>
-            ) : filteredAnswers.map((ans, i) => {
-              const q = ans.questions;
-              if (!q) return null;
-              const isExpanded = expandedId === ans.question_id;
-              const isCorrect = ans.is_correct;
-              const isSkipped = !ans.selected_option;
-
-              return (
-                <div key={ans.question_id} className="border border-white/5 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : ans.question_id)}
-                    className="w-full flex items-center gap-4 p-4 text-left hover:bg-white/[0.02] transition-colors"
-                  >
-                    <div className="flex-shrink-0">
-                      {isCorrect ? <CheckCircle2 className="w-5 h-5 text-green-400" />
-                        : isSkipped ? <MinusCircle className="w-5 h-5 text-gray-500" />
-                          : <XCircle className="w-5 h-5 text-red-400" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-300 line-clamp-1">Q{i + 1}. {q.question_text}</p>
-                      {q.subject && <span className="text-xs text-gray-600">{q.subject}{q.topic ? ` · ${q.topic}` : ""}</span>}
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {!isSkipped && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${isCorrect ? "text-green-400 bg-green-500/10" : "text-red-400 bg-red-500/10"}`}>
-                          {isCorrect ? "+2" : "-0.66"}
-                        </span>
-                      )}
-                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="px-5 pb-5 pt-1 border-t border-white/5">
-                      <p className="text-gray-300 mb-5 text-sm leading-relaxed">{q.question_text}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
-                        {(["A", "B", "C", "D"] as const).map(opt => {
-                          const text = q[`option_${opt.toLowerCase()}` as keyof Question] as string;
-                          const isCorrectOpt = opt === q.correct_option;
-                          const isUserOpt = opt === ans.selected_option;
-                          return (
-                            <div key={opt} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${isCorrectOpt ? "bg-green-500/10 border-green-500/30 text-green-300" : isUserOpt && !isCorrectOpt ? "bg-red-500/10 border-red-500/30 text-red-300" : "bg-background border-white/5 text-gray-500"}`}>
-                              <span className="font-bold flex-shrink-0">{opt}.</span>
-                              <span className="leading-relaxed">{text}</span>
-                              {isCorrectOpt && <CheckCircle2 className="w-4 h-4 flex-shrink-0 ml-auto" />}
-                              {isUserOpt && !isCorrectOpt && <XCircle className="w-4 h-4 flex-shrink-0 ml-auto" />}
-                            </div>
-                          );
-                        })}
+            {/* Question list */}
+            <div className="divide-y divide-zinc-800/60">
+              {filteredAnswers.length === 0 ? (
+                <p className="text-zinc-500 text-center py-12">No {filter.toLowerCase()} questions found.</p>
+              ) : filteredAnswers.map((ans, index) => {
+                const originalIndex = answers.findIndex(a => a.question_id === ans.question_id);
+                return (
+                  <div key={ans.question_id} className="p-4 sm:p-6 hover:bg-zinc-800/20 transition-colors">
+                    
+                    {/* Question header */}
+                    <div className="flex items-start gap-3 mb-4">
+                      <span className={`flex-shrink-0 w-8 h-8 mt-0.5 rounded-full flex items-center justify-center text-sm font-bold ${
+                          !ans.selected_option ? 'bg-zinc-800 text-zinc-400' : 
+                          ans.is_correct ? 'bg-green-950 text-green-400 ring-1 ring-green-900' : 'bg-red-950 text-red-400 ring-1 ring-red-900'
+                        }`}>
+                        {originalIndex + 1}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-zinc-200 text-base leading-relaxed">{ans.questions?.question_text}</p>
+                        {ans.questions?.subject && (
+                          <span className="inline-block mt-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">{ans.questions.subject}</span>
+                        )}
                       </div>
-                      
-                      {/* Explanation */}
-                      {q.explanation && (
-                        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Explanation</p>
-                          <p className="text-gray-300 text-sm leading-relaxed">{q.explanation}</p>
-                        </div>
-                      )}
-
-                      {/* Section A: Why wrong options fail */}
-                      {(q.why_a_wrong || q.why_b_wrong || q.why_c_wrong || q.why_d_wrong) && (
-                        <div className="mt-4 bg-[#1a1a1a] border border-amber-500/30 rounded-xl p-4">
-                          <h4 className="text-sm font-semibold text-amber-500 mb-3">Why the wrong options fail</h4>
-                          <div className="space-y-2">
-                            {(['A','B','C','D'] as const).map(opt => {
-                              const wrongReason = q[`why_${opt.toLowerCase()}_wrong` as keyof Question] as string;
-                              if (opt !== q.correct_option && wrongReason) {
-                                return (
-                                  <div key={opt} className="text-sm">
-                                    <span className="font-bold text-gray-400">Option {opt}:</span> <span className="text-gray-300">{wrongReason}</span>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Section B: Elimination Tip */}
-                      {q.elimination_tip && (
-                        <div className="mt-3 bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-                          <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">🎯 Elimination Tip</h4>
-                          <p className="text-sm text-gray-300">{q.elimination_tip}</p>
-                        </div>
-                      )}
-
-                      {/* Section C: Static Connection */}
-                      {q.static_topic_link && (
-                        <div className="mt-3 bg-[#1a1a1a] border border-blue-500/30 rounded-xl p-4">
-                          <h4 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">🔗 Static Syllabus Connection</h4>
-                          <p className="text-sm text-gray-300 mb-3">{q.static_topic_link}</p>
-                          <button onClick={() => window.open(`/practice-tests?topic=${encodeURIComponent(q.topic || "")}`, '_blank')} className="text-xs bg-blue-500/20 text-blue-300 px-3 py-1.5 rounded-md hover:bg-blue-500/30 transition-colors">
-                            Practice this topic →
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    {/* Options */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 ml-0 sm:ml-11">
+                      {['a','b','c','d'].map(opt => {
+                        const isCorrect = opt.toLowerCase() === ans.questions?.correct_option?.toLowerCase();
+                        const isSelected = opt.toLowerCase() === ans.selected_option?.toLowerCase();
+                        const text = ans.questions?.[`option_${opt}` as keyof Question];
+                        
+                        return (
+                          <div key={opt} className={`px-4 py-3 rounded-xl text-sm flex items-start gap-3 border transition-colors ${
+                            isCorrect ? 'border-green-600/50 bg-green-950/30 text-green-300' : 
+                            isSelected && !isCorrect ? 'border-red-600/50 bg-red-950/30 text-red-300' : 
+                            'border-zinc-800 bg-zinc-800/30 text-zinc-400'
+                          }`}>
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                              isCorrect ? 'bg-green-700 text-white' : 
+                              isSelected ? 'bg-red-700 text-white' : 'bg-zinc-700 text-zinc-300'
+                            }`}>
+                              {opt.toUpperCase()}
+                            </span>
+                            <span className="mt-0.5 leading-relaxed">{text}</span>
+                            {isCorrect && <span className="ml-auto text-green-400 font-bold">✓</span>}
+                            {isSelected && !isCorrect && <span className="ml-auto text-red-400 font-bold">✗</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Explanation - collapsible */}
+                    <details className="ml-0 sm:ml-11 group">
+                      <summary className="text-amber-500 text-sm cursor-pointer hover:text-amber-400 font-medium inline-flex items-center gap-1 select-none">
+                        View Explanation & Analysis <span className="text-xs opacity-60 group-open:rotate-180 transition-transform">▼</span>
+                      </summary>
+                      <div className="mt-4 space-y-3">
+                        {/* Explanation */}
+                        {ans.questions?.explanation && (
+                          <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700/50">
+                            <p className="text-zinc-300 text-xs font-bold uppercase tracking-wider mb-2">📖 Explanation</p>
+                            <p className="text-zinc-400 text-sm leading-relaxed">{ans.questions.explanation}</p>
+                          </div>
+                        )}
+
+                        {/* Why wrong */}
+                        {['a','b','c','d'].some(opt => opt !== ans.questions?.correct_option?.toLowerCase() && ans.questions?.[`why_${opt}_wrong` as keyof Question]) && (
+                          <div className="bg-red-950/20 rounded-xl p-4 border border-red-900/30">
+                            <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">❌ Why wrong options fail</p>
+                            <div className="space-y-2">
+                              {['a','b','c','d'].map(opt => {
+                                if (opt === ans.questions?.correct_option?.toLowerCase()) return null;
+                                const why = ans.questions?.[`why_${opt}_wrong` as keyof Question] as string;
+                                if (!why) return null;
+                                return (
+                                  <p key={opt} className="text-zinc-400 text-sm">
+                                    <span className="text-zinc-300 font-medium">Option {opt.toUpperCase()}:</span> {why}
+                                  </p>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Elimination tip */}
+                        {ans.questions?.elimination_tip && (
+                          <div className="bg-amber-950/20 rounded-xl p-4 border border-amber-900/30">
+                            <p className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">🎯 Elimination Tip</p>
+                            <p className="text-zinc-400 text-sm">{ans.questions.elimination_tip}</p>
+                          </div>
+                        )}
+
+                        {/* Static link */}
+                        {ans.questions?.static_topic_link && (
+                          <div className="bg-blue-950/20 rounded-xl p-4 border border-blue-900/30">
+                            <p className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">🔗 Static Connection</p>
+                            <p className="text-zinc-400 text-sm">{ans.questions.static_topic_link}</p>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-
-        {/* ── Bottom CTAs ────────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap gap-4 justify-end">
-          <Link href="/practice-tests" className="flex items-center gap-2 px-6 py-3 border border-white/10 text-gray-300 rounded-lg hover:bg-white/5 transition-colors font-medium">
-            <RotateCcw className="w-4 h-4" /> Retake Similar Test
-          </Link>
-          <Link href="/mock-tests" className="flex items-center gap-2 px-6 py-3 border border-white/10 text-gray-300 rounded-lg hover:bg-white/5 transition-colors font-medium">
-            Back to Mock Tests
-          </Link>
-          <Link href="/performance" className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-bold hover:bg-primary/90 shadow-[0_0_15px_rgba(255,191,0,0.2)] transition-colors">
-            View Performance <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {/* ── Bottom Share Card ────────────────────────────────────────────────── */}
-        <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 mt-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="text-white font-bold text-lg mb-1">{d.mode === "mock" ? "Mock Test" : "Practice Session"} Result</h3>
-            <p className="text-gray-400 text-sm">Score: {d.score.toFixed(1)}/{d.total_marks || 0} • Accuracy: {accuracy}%</p>
-          </div>
-          <button onClick={handleShare} className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 text-white rounded-lg hover:bg-white/10 transition-colors font-medium whitespace-nowrap">
-            {copied ? <span className="text-green-400">Copied! ✓</span> : <><Copy className="w-4 h-4"/> 📋 Copy Result</>}
-          </button>
-        </div>
-
       </div>
-
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl bg-[#1a1a1a] text-amber-500 border border-white/10 flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in">
-          <span className="font-bold text-sm">{toastMsg}</span>
-        </div>
-      )}
     </ProtectedRoute>
   );
 }
