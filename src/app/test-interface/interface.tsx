@@ -193,7 +193,16 @@ export default function TestInterfaceInner() {
       }
 
       // 2. Save via server route (uses service role key, bypasses schema cache + RLS)
-      const answerRows = questions.map(q => {
+      interface AnswerRow {
+        attempt_id: string
+        question_id: string
+        selected_option: string | null
+        is_correct: boolean
+        time_spent_seconds: number
+        marked_for_review: boolean
+      }
+
+      const answerRows: AnswerRow[] = questions.map(q => {
         const userAnswer = answers[q.id]
         const correctAnswer = q.correct_option
         
@@ -266,7 +275,7 @@ export default function TestInterfaceInner() {
             p_correct: stats.correct,
           });
           if (rpcError) console.error('Stats update error:', rpcError);
-        } catch (e) {
+        } catch (e: unknown) {
           console.error('Stats update error:', e);
         }
       }
@@ -290,7 +299,7 @@ export default function TestInterfaceInner() {
           setTimeout(() => { router.push(`/results?attempt_id=${attemptId}`); }, 2500);
           return;
         }
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('Progress update failed (non-fatal):', e);
       }
 
@@ -298,11 +307,11 @@ export default function TestInterfaceInner() {
       console.log('Redirecting to results:', attemptId);
       router.push(`/results?attempt_id=${attemptId}`);
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('=== SUBMIT FAILED ===', error);
       alert(
         'Test submission failed.\n\n' +
-        'Error: ' + String(error) +
+        'Error: ' + (error instanceof Error ? error.message : String(error)) +
         '\n\nPlease check the browser console (F12) and share the error with support.'
       );
       setSubmitting(false);
