@@ -38,7 +38,7 @@ interface AttemptAnswer {
   selected_option: string | null;
   is_correct: boolean;
   is_marked?: boolean;
-  questions?: any;
+  questions?: Question | null;
 }
 
 interface AttemptData {
@@ -143,7 +143,7 @@ export default function ResultsInner() {
           console.error('Answers fetch error:', answersError);
         }
 
-        setAnswers(answersData || []);
+        setAnswers((answersData as unknown as AttemptAnswer[]) || []);
       } catch (err) {
         console.error('Results fetch error:', err);
         setErrorMsg('Something went wrong loading results.');
