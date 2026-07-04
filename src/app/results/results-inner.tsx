@@ -48,6 +48,10 @@ interface AttemptData {
   time_taken_seconds: number;
   mode: string;
   submitted_at: string;
+  correct_count: number;
+  wrong_count: number;
+  unattempted_count: number;
+  accuracy_percent: number;
 }
 
 type FilterType = "All" | "Correct" | "Incorrect" | "Skipped";
