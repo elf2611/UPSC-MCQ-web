@@ -233,12 +233,17 @@ export default function TestInterfaceInner() {
         });
 
         for (const [subjId, stats] of Object.entries(subjectStats)) {
-          await supabase.rpc('upsert_user_statistics', {
-            p_user_id: user.uid,
-            p_subject_id: subjId,
-            p_attempted: stats.attempted,
-            p_correct: stats.correct,
-          }).catch((e: unknown) => console.error('Stats update error:', e));
+          try {
+            const { error: rpcError } = await supabase.rpc('upsert_user_statistics', {
+              p_user_id: user.uid,
+              p_subject_id: subjId,
+              p_attempted: stats.attempted,
+              p_correct: stats.correct,
+            });
+            if (rpcError) console.error('Stats update error:', rpcError);
+          } catch (e) {
+            console.error('Stats update error:', e);
+          }
         }
 
         // 2. Update XP and Streak
