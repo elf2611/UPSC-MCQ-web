@@ -194,7 +194,6 @@ export default function TestInterfaceInner() {
 
       // 2. Save via server route (uses service role key, bypasses schema cache + RLS)
       interface AnswerRow {
-        attempt_id: string
         question_id: string
         selected_option: string | null
         is_correct: boolean
@@ -216,7 +215,6 @@ export default function TestInterfaceInner() {
         console.log(`Q ${q.id}: user="${userAnswer}" correct="${correctAnswer}" isCorrect=${isCorrect}`)
         
         return {
-          attempt_id: attemptId,
           question_id: q.id,
           selected_option: userAnswer || null,
           is_correct: isCorrect, // explicit true/false
