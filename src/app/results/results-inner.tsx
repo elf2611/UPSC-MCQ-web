@@ -24,6 +24,7 @@ interface Question {
   explanation?: string;
   subject?: string;
   topic?: string;
+  difficulty?: string;
   why_a_wrong?: string;
   why_b_wrong?: string;
   why_c_wrong?: string;
@@ -48,6 +49,10 @@ interface AttemptData {
   time_taken_seconds: number;
   mode: string;
   submitted_at: string;
+  correct_count: number;
+  wrong_count: number;
+  unattempted_count: number;
+  accuracy_percent: number;
 }
 
 type FilterType = "All" | "Correct" | "Incorrect" | "Skipped";
@@ -84,6 +89,7 @@ export default function ResultsInner() {
   const [filter, setFilter] = useState<FilterType>("All");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [answersFallback, setAnswersFallback] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -101,8 +107,13 @@ export default function ResultsInner() {
           .eq("user_id", user.uid)
           .single();
 
+        console.log('=== RESULTS DEBUG ===')
+        console.log('attempt_id from URL:', attemptId)
+        console.log('current user uid:', user?.uid)
+        console.log('attempt data:', JSON.stringify(attemptData, null, 2))
+        console.log('attempt error:', attemptError)
+
         if (attemptError || !attemptData) {
-          console.error('Attempt fetch error:', attemptError);
           setErrorMsg(attemptError?.message || 'Results not found. The test may not have saved correctly.');
           setLoading(false);
           return;
@@ -111,13 +122,13 @@ export default function ResultsInner() {
         setAttempt(attemptData);
 
         const { data: answersData, error: answersError } = await supabase
-          .from("attempt_answers")
+          .from('attempt_answers')
           .select(`
             id,
-            question_id,
             selected_option,
             is_correct,
             marked_for_review,
+            question_id,
             questions (
               id,
               question_text,
@@ -134,16 +145,31 @@ export default function ResultsInner() {
               elimination_tip,
               static_topic_link,
               subject,
-              topic
+              topic,
+              difficulty
             )
           `)
-          .eq("attempt_id", attemptId);
+          .eq('attempt_id', attemptId)
+          .order('id')
 
-        if (answersError) {
-          console.error('Answers fetch error:', answersError);
+        console.log('answers count:', answersData?.length)
+        console.log('first answer:', JSON.stringify(answersData?.[0], null, 2))
+        console.log('answers error:', answersError)
+
+        const { count } = await supabase
+          .from('attempt_answers')
+          .select('*', { count: 'exact', head: true })
+          .eq('attempt_id', attemptId)
+
+        console.log('Answer count for this attempt:', count)
+
+        if (!answersData || answersData.length === 0 || count === 0) {
+          setAnswers([]);
+          setAnswersFallback(true);
+        } else {
+          setAnswers((answersData as unknown as AttemptAnswer[]) || []);
         }
 
-        setAnswers((answersData as unknown as AttemptAnswer[]) || []);
       } catch (err) {
         console.error('Results fetch error:', err);
         setErrorMsg('Something went wrong loading results.');
@@ -173,47 +199,39 @@ export default function ResultsInner() {
     </div>
   );
 
-  // Stats calculation
-  let correct = 0;
-  let wrong = 0;
-  let unattempted = 0;
+  // FIX 1: Exact Supabase column fields
+  const score = attempt?.score ?? 0;
+  const correct = attempt?.correct_count ?? 0;
+  const wrong = attempt?.wrong_count ?? 0;
+  const unattempted = attempt?.unattempted_count ?? 0;
+  const totalMarks = attempt?.total_marks ?? 0;
+  const timeTaken = attempt?.time_taken_seconds ?? 0;
+  
+  // Accuracy fallback
+  const displayAccuracy = attempt?.accuracy_percent > 0 
+    ? attempt.accuracy_percent
+    : correct > 0 
+    ? Math.round((correct / (correct + wrong)) * 100)
+    : 0;
 
-  answers.forEach(a => {
-    if (!a.selected_option) unattempted++;
-    else if (a.is_correct) correct++;
-    else wrong++;
-  });
-
-  const attemptedCount = correct + wrong;
-  const accuracy = attemptedCount > 0 ? Math.round((correct / attemptedCount) * 100) : 0;
-  const score = attempt.score;
-  const totalMarks = attempt.total_marks || (answers.length * 2);
-
-  // Subject Breakdown
-  const subjectBreakdown: Record<string, { correct: number; wrong: number; unattempted: number; total: number }> = {};
+  // FIX 4: Subject Breakdown Chart
+  const subjectMap: Record<string, { correct: number, wrong: number, skipped: number }> = {};
   
   answers.forEach(ans => {
-    const subject = ans.questions?.subject || 'Unknown';
-    if (!subjectBreakdown[subject]) {
-      subjectBreakdown[subject] = { correct: 0, wrong: 0, unattempted: 0, total: 0 };
+    const subject = ans.questions?.subject || 'Other';
+    if (!subjectMap[subject]) {
+      subjectMap[subject] = { correct: 0, wrong: 0, skipped: 0 };
     }
-    subjectBreakdown[subject].total++;
-    
     if (!ans.selected_option) {
-      subjectBreakdown[subject].unattempted++;
+      subjectMap[subject].skipped++;
     } else if (ans.is_correct) {
-      subjectBreakdown[subject].correct++;
+      subjectMap[subject].correct++;
     } else {
-      subjectBreakdown[subject].wrong++;
+      subjectMap[subject].wrong++;
     }
   });
 
-  const chartData = Object.entries(subjectBreakdown).map(([subject, data]) => ({
-    subject: subject.substring(0, 10), // truncate for chart
-    correct: data.correct,
-    wrong: data.wrong,
-    skipped: data.unattempted,
-  }));
+  const chartData = Object.entries(subjectMap).map(([name, vals]) => ({ name, ...vals }));
 
   // Filtering
   const filteredAnswers = answers.filter(a => {
@@ -256,23 +274,25 @@ export default function ResultsInner() {
                   <circle cx="72" cy="72" r="60" fill="none" stroke="#27272a" strokeWidth="12" />
                   <circle cx="72" cy="72" r="60"
                     fill="none" 
-                    stroke={accuracy >= 60 ? "#f59e0b" : "#ef4444"}
+                    stroke={displayAccuracy >= 60 ? "#f59e0b" : "#ef4444"}
                     strokeWidth="12"
                     strokeDasharray={`${2 * Math.PI * 60}`}
-                    strokeDashoffset={`${2 * Math.PI * 60 * (1 - accuracy/100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 60 * (1 - displayAccuracy/100)}`}
                     strokeLinecap="round"
                     className="transition-all duration-1000" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-amber-400">{accuracy}%</span>
+                  <span className="text-3xl font-bold text-amber-400">{displayAccuracy}%</span>
                   <span className="text-zinc-400 text-xs mt-1">Accuracy</span>
                 </div>
               </div>
-              <div className="text-4xl font-bold text-white mb-1">
-                {score.toFixed(1)}
-                <span className="text-xl text-zinc-400 font-normal ml-1">/ {totalMarks}</span>
+              <div>
+                <div className="text-5xl font-bold text-white">
+                  {score}
+                  <span className="text-2xl text-zinc-400 font-normal ml-1">/{totalMarks}</span>
+                </div>
+                <p className="text-zinc-400 text-sm mt-1">Total Score</p>
               </div>
-              <p className="text-zinc-400 text-sm">Total Score</p>
             </div>
 
             {/* Stats grid - takes 3 cols */}
@@ -280,32 +300,32 @@ export default function ResultsInner() {
               {/* Correct */}
               <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-green-500 flex flex-col justify-center">
                 <div className="text-3xl font-bold text-green-400 mb-1">{correct}</div>
-                <div className="text-zinc-400 text-sm font-medium">Correct</div>
-                <div className="text-green-500 text-xs mt-1 font-medium">+{(correct * 2).toFixed(2)} marks</div>
+                <div className="text-zinc-400 text-sm font-medium">Correct answers</div>
+                <div className="text-green-500 text-xs mt-1 font-medium">+{(correct * 2).toFixed(1)} marks</div>
               </div>
 
               {/* Wrong */}
               <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-red-500 flex flex-col justify-center">
                 <div className="text-3xl font-bold text-red-400 mb-1">{wrong}</div>
-                <div className="text-zinc-400 text-sm font-medium">Incorrect</div>
-                <div className="text-red-500 text-xs mt-1 font-medium">-{(wrong * (2/3)).toFixed(2)} marks</div>
+                <div className="text-zinc-400 text-sm font-medium">Wrong answers</div>
+                <div className="text-red-500 text-xs mt-1 font-medium">-{(wrong * 0.67).toFixed(1)} marks</div>
               </div>
 
               {/* Skipped */}
               <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-zinc-500 flex flex-col justify-center">
                 <div className="text-3xl font-bold text-zinc-300 mb-1">{unattempted}</div>
-                <div className="text-zinc-400 text-sm font-medium">Skipped</div>
+                <div className="text-zinc-400 text-sm font-medium">Skipped answers</div>
                 <div className="text-zinc-500 text-xs mt-1 font-medium">0 marks</div>
               </div>
 
               {/* Time */}
               <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-blue-500 flex flex-col justify-center">
                 <div className="text-3xl font-bold text-blue-400 mb-1">
-                  {formatTime(attempt.time_taken_seconds)}
+                  {formatTime(timeTaken)}
                 </div>
                 <div className="text-zinc-400 text-sm font-medium">Time Taken</div>
                 <div className="text-blue-500 text-xs mt-1 font-medium">
-                  ~{Math.round((attempt.time_taken_seconds || 0) / (correct + wrong + unattempted || 1))}s per question
+                  ~{Math.round((timeTaken || 0) / (correct + wrong + unattempted || 1))}s per question
                 </div>
               </div>
             </div>
@@ -316,11 +336,11 @@ export default function ResultsInner() {
             <h2 className="text-white font-semibold mb-6">Subject-wise Breakdown</h2>
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={chartData} barSize={20} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
+                <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                  <XAxis dataKey="subject" tick={{ fill: '#a1a1aa', fontSize: 12 }} axisLine={false} tickLine={false} tickMargin={15} />
-                  <YAxis tick={{ fill: '#a1a1aa', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px', color: '#fff' }} />
+                  <XAxis dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={15} />
+                  <YAxis tick={{ fill: '#a1a1aa', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: '8px' }} />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="correct" fill="#22c55e" radius={[4,4,0,0]} name="Correct" />
                   <Bar dataKey="wrong" fill="#ef4444" radius={[4,4,0,0]} name="Wrong" />
@@ -328,7 +348,9 @@ export default function ResultsInner() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-zinc-500 text-center py-8">No subject data available</p>
+              <p className="text-zinc-500 text-center py-12 text-sm">
+                No subject data available for this attempt
+              </p>
             )}
           </div>
 
@@ -352,13 +374,27 @@ export default function ResultsInner() {
             </div>
 
             {/* Question list */}
+            {answersFallback && (
+              <p className="text-zinc-400 text-center py-6 text-sm bg-zinc-800/20">
+                Detailed answer breakdown unavailable for this attempt. Future tests will show full review.
+              </p>
+            )}
+            
             <div className="divide-y divide-zinc-800/60">
-              {filteredAnswers.length === 0 ? (
+              {filteredAnswers.length === 0 && !answersFallback ? (
                 <p className="text-zinc-500 text-center py-12">No {filter.toLowerCase()} questions found.</p>
               ) : filteredAnswers.map((ans) => {
                 const originalIndex = answers.findIndex(a => a.question_id === ans.question_id);
+                
+                // Border styling logic based on correctness
+                const borderStyle = !ans.selected_option 
+                  ? 'border-l-4 border-zinc-600' 
+                  : ans.is_correct 
+                  ? 'border-l-4 border-green-500' 
+                  : 'border-l-4 border-red-500';
+
                 return (
-                  <div key={ans.question_id} className="p-4 sm:p-6 hover:bg-zinc-800/20 transition-colors">
+                  <div key={ans.question_id} className={`p-4 sm:p-6 hover:bg-zinc-800/20 transition-colors ${borderStyle}`}>
                     
                     {/* Question header */}
                     <div className="flex items-start gap-3 mb-4">
@@ -403,56 +439,51 @@ export default function ResultsInner() {
                       })}
                     </div>
 
-                    {/* Explanation - collapsible */}
-                    <details className="ml-0 sm:ml-11 group">
-                      <summary className="text-amber-500 text-sm cursor-pointer hover:text-amber-400 font-medium inline-flex items-center gap-1 select-none">
-                        View Explanation & Analysis <span className="text-xs opacity-60 group-open:rotate-180 transition-transform">▼</span>
-                      </summary>
-                      <div className="mt-4 space-y-3">
-                        {/* Explanation */}
-                        {ans.questions?.explanation && (
-                          <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700/50">
-                            <p className="text-zinc-300 text-xs font-bold uppercase tracking-wider mb-2">📖 Explanation</p>
-                            <p className="text-zinc-400 text-sm leading-relaxed">{ans.questions.explanation}</p>
-                          </div>
-                        )}
+                    {/* Explanation - Always visible */}
+                    <div className="ml-0 sm:ml-11 mt-4 space-y-3">
+                      {/* Explanation */}
+                      {ans.questions?.explanation && (
+                        <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700/50">
+                          <p className="text-zinc-300 text-xs font-bold uppercase tracking-wider mb-2">📖 Explanation</p>
+                          <p className="text-zinc-400 text-sm leading-relaxed">{ans.questions.explanation}</p>
+                        </div>
+                      )}
 
-                        {/* Why wrong */}
-                        {['a','b','c','d'].some(opt => opt !== ans.questions?.correct_option?.toLowerCase() && ans.questions?.[`why_${opt}_wrong` as keyof Question]) && (
-                          <div className="bg-red-950/20 rounded-xl p-4 border border-red-900/30">
-                            <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">❌ Why wrong options fail</p>
-                            <div className="space-y-2">
-                              {['a','b','c','d'].map(opt => {
-                                if (opt === ans.questions?.correct_option?.toLowerCase()) return null;
-                                const why = ans.questions?.[`why_${opt}_wrong` as keyof Question] as string;
-                                if (!why) return null;
-                                return (
-                                  <p key={opt} className="text-zinc-400 text-sm">
-                                    <span className="text-zinc-300 font-medium">Option {opt.toUpperCase()}:</span> {why}
-                                  </p>
-                                );
-                              })}
-                            </div>
+                      {/* Why wrong */}
+                      {['a','b','c','d'].some(opt => opt !== ans.questions?.correct_option?.toLowerCase() && ans.questions?.[`why_${opt}_wrong` as keyof Question]) && (
+                        <div className="bg-red-950/20 rounded-xl p-4 border border-red-900/30">
+                          <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">❌ Why wrong options fail</p>
+                          <div className="space-y-2">
+                            {['a','b','c','d'].map(opt => {
+                              if (opt === ans.questions?.correct_option?.toLowerCase()) return null;
+                              const why = ans.questions?.[`why_${opt}_wrong` as keyof Question] as string;
+                              if (!why) return null;
+                              return (
+                                <p key={opt} className="text-zinc-400 text-sm">
+                                  <span className="text-zinc-300 font-medium">Option {opt.toUpperCase()}:</span> {why}
+                                </p>
+                              );
+                            })}
                           </div>
-                        )}
+                        </div>
+                      )}
 
-                        {/* Elimination tip */}
-                        {ans.questions?.elimination_tip && (
-                          <div className="bg-amber-950/20 rounded-xl p-4 border border-amber-900/30">
-                            <p className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">🎯 Elimination Tip</p>
-                            <p className="text-zinc-400 text-sm">{ans.questions.elimination_tip}</p>
-                          </div>
-                        )}
+                      {/* Elimination tip */}
+                      {ans.questions?.elimination_tip && (
+                        <div className="bg-amber-950/20 rounded-xl p-4 border border-amber-900/30">
+                          <p className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">🎯 Elimination Tip</p>
+                          <p className="text-zinc-400 text-sm">{ans.questions.elimination_tip}</p>
+                        </div>
+                      )}
 
-                        {/* Static link */}
-                        {ans.questions?.static_topic_link && (
-                          <div className="bg-blue-950/20 rounded-xl p-4 border border-blue-900/30">
-                            <p className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">🔗 Static Connection</p>
-                            <p className="text-zinc-400 text-sm">{ans.questions.static_topic_link}</p>
-                          </div>
-                        )}
-                      </div>
-                    </details>
+                      {/* Static link */}
+                      {ans.questions?.static_topic_link && (
+                        <div className="bg-blue-950/20 rounded-xl p-4 border border-blue-900/30">
+                          <p className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">🔗 Static Connection</p>
+                          <p className="text-zinc-400 text-sm">{ans.questions.static_topic_link}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
