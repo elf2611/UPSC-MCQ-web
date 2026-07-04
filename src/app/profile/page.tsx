@@ -54,17 +54,18 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadHistory = async () => {
-      if (!user) return;
-      const { data } = await supabase
+      if (!user?.uid) return;
+      const { data, error } = await supabase
         .from("test_attempts")
         .select("*")
         .eq("user_id", user.uid)
-        .order("created_at", { ascending: false })
-        .limit(20);
+        .order("submitted_at", { ascending: false })
+        .limit(50);
+      console.log('Test history:', data?.length, error);
       if (data && data.length > 0) setHistory(data);
     };
     loadHistory();
-  }, [user]);
+  }, [user?.uid]);
 
   const handleSaveAccount = async () => {
     if (!user) return;

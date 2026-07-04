@@ -96,104 +96,133 @@ export default function PerformancePage() {
   const [badges, setBadges] = useState<BadgeDef[]>(ALL_BADGES);
 
   useEffect(() => {
-    const load = async () => {
-      if (!user) return;
-
-      // 1. Fetch Profile
-      const { data: pData } = await supabase.from("profiles").select("xp, level, streak_count").eq("id", user.uid).single();
-      if (pData) setProfile(pData);
-
-      // 2. Fetch Total Practiced & Heatmap
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
-
-      const { data: hData, count } = await supabase
-        .from("attempt_answers")
-        .select("created_at", { count: 'exact' })
-        .eq("user_id", user.uid);
-      
-      setTotalPracticed(count || 0);
-
-      if (hData) {
-        const counts: Record<string, number> = {};
-        hData.forEach(row => {
-          if (row.created_at) {
-            const d = row.created_at.split("T")[0];
-            if (d >= ninetyStr) {
-              counts[d] = (counts[d] || 0) + 1;
-            }
-          }
-        });
-        setHeatmapMap(counts);
-      }
-
-      // 3. Fetch Subject Level Stats (Accuracy & Radar)
-      const { data: statData } = await supabase
-        .from("user_statistics")
-        .select("total_attempted, total_correct")
-        .eq("user_id", user.uid);
-
-      if (statData && statData.length > 0) {
-        const tAttempted = statData.reduce((acc, row) => acc + row.total_attempted, 0);
-        const tCorrect = statData.reduce((acc, row) => acc + row.total_correct, 0);
-        setOverallAccuracy(tAttempted > 0 ? Math.round((tCorrect / tAttempted) * 100) : 0);
-      }
-
-      // 4. Fetch Weak Topics
-      const { data: weakData } = await supabase
-        .from("user_statistics")
-        .select("accuracy_percent, total_attempted, subject_id")
-        .eq("user_id", user.uid)
-        .gte("total_attempted", 2) // set low for testing
-        .order("accuracy_percent", { ascending: true })
-        .limit(5);
-
-      if (weakData) {
-        setWeakTopics(weakData.map(w => ({
-          topic_name: w.subject_id || "Unknown Subject",
-          topic_slug: "",
-          subject_name: w.subject_id || "Unknown Subject",
-          subject_slug: "",
-          accuracy: Number(w.accuracy_percent),
-          attempted: Number(w.total_attempted)
-        })));
-      }
-
-      // 5. Fetch Badges
-      const { data: badgeData } = await supabase
-        .from("achievements")
-        .select("badge_name, earned_at")
-        .eq("user_id", user.uid);
-
-      if (badgeData) {
-        const earnedMap = new Map(badgeData.map(b => [b.badge_name, b.earned_at]));
-        const mergedBadges = ALL_BADGES.map(b => ({
-          ...b,
-          earned: earnedMap.has(b.name),
-          earnedAt: earnedMap.get(b.name)
-        }));
-        setBadges(mergedBadges);
-      }
-
-      // 6. Recent Tests
-      const { data: testData } = await supabase
-        .from("test_attempts")
-        .select("*")
-        .eq("user_id", user.uid)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (testData) setAttempts(testData);
-
+    // Don't fetch until we have the user uid specifically
+    if (!user?.uid) {
       setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const uid = user.uid;
+    console.log('Fetching performance for uid:', uid);
+
+    const load = async () => {
+      try {
+        // 1. Fetch Profile
+        const { data: pData } = await supabase.from("profiles").select("xp, level, streak_count").eq("id", uid).single();
+        if (pData) setProfile(pData);
+
+        // 2. Fetch Recent Tests (order by submitted_at)
+        const { data: testData, error: testError } = await supabase
+          .from("test_attempts")
+          .select("*")
+          .eq("user_id", uid)
+          .order("submitted_at", { ascending: false })
+          .limit(10);
+        console.log('Attempts fetched:', testData?.length, testError);
+        if (testData) setAttempts(testData);
+
+        // 3. Compute total practiced & accuracy from attempt_answers
+        const attemptIds = (testData || []).map((a: Record<string, unknown>) => a.id);
+        let totalPracticedCount = 0;
+        let totalCorrectCount = 0;
+        const heatCounts: Record<string, number> = {};
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
+
+        if (attemptIds.length > 0) {
+          const { data: answersData } = await supabase
+            .from("attempt_answers")
+            .select("is_correct, created_at")
+            .in("attempt_id", attemptIds);
+
+          if (answersData) {
+            totalPracticedCount = answersData.length;
+            totalCorrectCount = answersData.filter((a: Record<string, unknown>) => a.is_correct).length;
+            answersData.forEach((row: Record<string, unknown>) => {
+              if (row.created_at) {
+                const d = (row.created_at as string).split("T")[0];
+                if (d >= ninetyStr) heatCounts[d] = (heatCounts[d] || 0) + 1;
+              }
+            });
+          }
+        }
+        setTotalPracticed(totalPracticedCount);
+        setOverallAccuracy(totalPracticedCount > 0 ? Math.round((totalCorrectCount / totalPracticedCount) * 100) : 0);
+        setHeatmapMap(heatCounts);
+
+        // 4. Fetch Weak Subjects from user_statistics
+        const { data: weakData } = await supabase
+          .from("user_statistics")
+          .select("accuracy_percent, total_attempted, subject_id")
+          .eq("user_id", uid)
+          .gte("total_attempted", 2)
+          .order("accuracy_percent", { ascending: true })
+          .limit(5);
+
+        if (weakData) {
+          setWeakTopics(weakData.map(w => ({
+            topic_name: w.subject_id || "Unknown Subject",
+            topic_slug: "",
+            subject_name: w.subject_id || "Unknown Subject",
+            subject_slug: "",
+            accuracy: Number(w.accuracy_percent),
+            attempted: Number(w.total_attempted)
+          })));
+        }
+
+        // 5. Fetch Badges
+        const { data: badgeData } = await supabase
+          .from("achievements")
+          .select("badge_name, earned_at")
+          .eq("user_id", uid);
+
+        if (badgeData) {
+          const earnedMap = new Map(badgeData.map(b => [b.badge_name, b.earned_at]));
+          const mergedBadges = ALL_BADGES.map(b => ({
+            ...b,
+            earned: earnedMap.has(b.name),
+            earnedAt: earnedMap.get(b.name)
+          }));
+          setBadges(mergedBadges);
+        }
+      } catch (err) {
+        console.error('Performance fetch failed:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
-  }, [user]);
+  }, [user?.uid]); // depend on uid specifically
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#121212]">
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
+  );
+
+  if (!user) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#121212]">
+      <div className="text-center">
+        <span className="text-5xl mb-4 block">🔐</span>
+        <p className="text-gray-400">Please log in to view your performance.</p>
+      </div>
+    </div>
+  );
+
+  if (attempts.length === 0) return (
+    <ProtectedRoute>
+      <div className="min-h-screen flex items-center justify-center bg-[#121212]">
+        <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm">
+          <span className="text-6xl">📊</span>
+          <h2 className="text-2xl font-bold text-white">No performance data yet</h2>
+          <p className="text-gray-400">Complete a practice session or mock test to see your analytics here.</p>
+          <a href="/practice-tests" className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
+            Start Practicing →
+          </a>
+        </div>
+      </div>
+    </ProtectedRoute>
   );
 
   const lvlIdx = (profile?.level || 1) - 1;

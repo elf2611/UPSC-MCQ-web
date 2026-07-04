@@ -55,7 +55,7 @@ export default function TestInterfaceInner() {
   const topic = searchParams.get("topic") || "";
   const difficulty = searchParams.get("difficulty") || "All Levels";
   const testId = searchParams.get("test_id") || "";
-  const customCount = parseInt(searchParams.get("count") || "50");
+  const customCount = parseInt(searchParams.get("count") || "20");
   const customTime = parseInt(searchParams.get("time") || "3600");
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -72,6 +72,7 @@ export default function TestInterfaceInner() {
   const [feedbackMode, setFeedbackMode] = useState(false);
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<{message: string, isLevelUp: boolean} | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   // Fetch bookmarks on load
   useEffect(() => {
@@ -120,6 +121,8 @@ export default function TestInterfaceInner() {
 
         const finalQuestions = data || [];
         setQuestions(finalQuestions);
+        // Record start time once questions are loaded
+        startTimeRef.current = Date.now();
         const initialStatus: Record<string, QuestionStatus> = {};
         finalQuestions.forEach(q => { initialStatus[q.id] = "not-visited"; });
         setQuestionStatus(initialStatus);
@@ -143,151 +146,161 @@ export default function TestInterfaceInner() {
     }));
   }, [currentIndex, questions]);
 
-  // Timer
+  // Timer/Submit
   const handleSubmit = useCallback(async () => {
     if (submitting) return;
     setSubmitting(true);
     clearInterval(timerRef.current!);
 
-    let score = 0;
-    let correctCount = 0;
-    questions.forEach(q => {
-      const ans = answers[q.id];
-      if (ans) {
-        if (ans === q.correct_option) {
-          score += 2;
-          correctCount++;
-        }
-        else score -= 0.66;
-      }
-    });
-    score = Math.round(score * 100) / 100;
-    const attemptedCount = Object.keys(answers).length;
-    const unattempted = questions.length - attemptedCount;
-    // Calculate total marks (assume 2 marks per question)
-    const totalMarks = questions.length * 2;
-    const accuracy = attemptedCount > 0 ? Math.round((correctCount / attemptedCount) * 100) : 0;
-    const timeTaken = customTime ? customTime - timeLeft : (mode === 'mock' ? 7200 : 3600) - timeLeft;
+    console.log('=== SUBMIT STARTED ===');
+    console.log('Current user:', user?.uid);
+    console.log('Questions count:', questions?.length);
+    console.log('Answers state:', answers);
 
     try {
-      if (user) {
-        // 1. Submit attempt
-        const { data: attemptData, error } = await supabase
-          .from("test_attempts")
-          .insert({
-            user_id: user.uid,
-            test_id: testId || null,
-            mode,
-            score,
-            total_marks: totalMarks,
-            correct_count: correctCount,
-            wrong_count: attemptedCount - correctCount,
-            unattempted_count: unattempted,
-            accuracy_percent: accuracy,
-            time_taken_seconds: timeTaken,
-            started_at: new Date(Date.now() - timeTaken * 1000).toISOString(),
-            submitted_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
+      // 1. Calculate scores
+      let score = 0;
+      let correctCount = 0;
+      let wrongCount = 0;
 
-        if (error) {
-          console.error("Attempt save error:", error);
-          throw new Error('Failed to save attempt: ' + error.message);
-        }
-        
-        const attemptId = attemptData.id;
-
-        // Save individual answers
-        const answerRows = questions.map(q => ({
-          attempt_id: attemptId,
-          question_id: q.id,
-          selected_option: answers[q.id] || null,
-          is_correct: answers[q.id] === q.correct_option,
-          time_spent_seconds: 0, // Using 0 as placeholder since per-question time isn't tracked yet
-          marked_for_review: questionStatus[q.id] === 'marked-for-review' || questionStatus[q.id] === 'answered-and-marked',
-        }));
-
-        const { error: answersError } = await supabase
-          .from('attempt_answers')
-          .insert(answerRows);
-
-        if (answersError) {
-          console.error('Answers save error:', answersError);
-        }
-
-        // Update user_statistics per subject
-        const subjectStats: Record<string, {correct: number, attempted: number}> = {};
-        
-        questions.forEach(q => {
-          const subjectId = q.subject_id || q.subject || 'unknown';
-          if (!subjectStats[subjectId]) {
-            subjectStats[subjectId] = { correct: 0, attempted: 0 };
-          }
-          if (answers[q.id]) {
-            subjectStats[subjectId].attempted++;
-            if (answers[q.id] === q.correct_option) {
-              subjectStats[subjectId].correct++;
-            }
-          }
-        });
-
-        for (const [subjId, stats] of Object.entries(subjectStats)) {
-          try {
-            const { error: rpcError } = await supabase.rpc('upsert_user_statistics', {
-              p_user_id: user.uid,
-              p_subject_id: subjId,
-              p_attempted: stats.attempted,
-              p_correct: stats.correct,
-            });
-            if (rpcError) console.error('Stats update error:', rpcError);
-          } catch (e) {
-            console.error('Stats update error:', e);
+      questions.forEach(q => {
+        const ans = answers[q.id];
+        if (ans) {
+          if (ans === q.correct_option) {
+            score += 2;
+            correctCount++;
+          } else {
+            score -= 0.66;
+            wrongCount++;
           }
         }
+      });
+      score = Math.round(score * 100) / 100;
+      const attemptedCount = correctCount + wrongCount;
+      const unattempted = questions.length - attemptedCount;
+      const totalMarks = questions.length * 2;
+      const accuracy = attemptedCount > 0 ? Math.round((correctCount / attemptedCount) * 100) : 0;
+      const timeTaken = startTimeRef.current > 0
+        ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+        : (mode === 'mock' ? 7200 : 3600) - timeLeft;
 
-        // 2. Update XP and Streak
-        try {
-          const res = await fetch("/api/update-progress", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: user.uid,
-              correctCount,
-              attemptedCount,
-              isMockTest: mode === "mock"
-            })
-          });
-          const progressData = await res.json();
-          
-          if (progressData && !progressData.error) {
-            setToastMessage({
-              message: progressData.leveledUp 
-                ? `🎉 Level Up! You are now Level ${progressData.newLevel}` 
-                : `🔥 ${progressData.newStreak} day streak | +${progressData.xpEarned} XP earned`,
-              isLevelUp: progressData.leveledUp
-            });
-            
-            // Wait a moment so user can see toast before redirect
-            setTimeout(() => {
-              router.push(`/results?attempt_id=${attemptId}`);
-            }, 3000);
-            return;
-          }
-        } catch (e) {
-          console.error("Progress update failed:", e);
-        }
-        
-        router.push(`/results?attempt_id=${attemptId}`);
-        return;
+      console.log('Scores:', { correctCount, wrongCount, unattempted, score, timeTaken });
+
+      if (!user) {
+        throw new Error('User not authenticated. Please log in again.');
       }
-    } catch (err) {
-      console.error('Submit error:', err);
-    }
 
-    sessionStorage.setItem("last_score", JSON.stringify({ score, total: questions.length, attempted: attemptedCount }));
-    router.push("/results");
-  }, [submitting, questions, answers, user, testId, mode, timeLeft, customTime, questionStatus, router]);
+      // 2. Save test_attempt
+      const { data: attemptData, error: attemptError } = await supabase
+        .from("test_attempts")
+        .insert({
+          user_id: user.uid,
+          test_id: testId || null,
+          mode,
+          score,
+          total_marks: totalMarks,
+          correct_count: correctCount,
+          wrong_count: wrongCount,
+          unattempted_count: unattempted,
+          accuracy_percent: accuracy,
+          time_taken_seconds: timeTaken,
+          started_at: new Date(Date.now() - timeTaken * 1000).toISOString(),
+          submitted_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      console.log('Attempt save result:', attemptData, attemptError);
+
+      if (attemptError || !attemptData) {
+        throw new Error('Failed to save attempt: ' + (attemptError?.message || 'No data returned'));
+      }
+
+      const attemptId = attemptData.id;
+      console.log('Attempt ID:', attemptId);
+
+      // 3. Save attempt_answers
+      const answerRows = questions.map(q => ({
+        attempt_id: attemptId,
+        question_id: q.id,
+        selected_option: answers[q.id] || null,
+        is_correct: answers[q.id] ? answers[q.id] === q.correct_option : false,
+        time_spent_seconds: 0,
+        marked_for_review: questionStatus[q.id] === 'marked-for-review' || questionStatus[q.id] === 'answered-and-marked',
+      }));
+
+      const { error: answersError } = await supabase
+        .from('attempt_answers')
+        .insert(answerRows);
+
+      if (answersError) {
+        // Log but don't block redirect
+        console.error('Answers save error (non-fatal):', answersError);
+      }
+
+      // 4. Update user_statistics per subject (non-fatal)
+      const subjectStats: Record<string, {correct: number, attempted: number}> = {};
+      questions.forEach(q => {
+        const subjectId = q.subject_id || q.subject || 'unknown';
+        if (!subjectStats[subjectId]) subjectStats[subjectId] = { correct: 0, attempted: 0 };
+        if (answers[q.id]) {
+          subjectStats[subjectId].attempted++;
+          if (answers[q.id] === q.correct_option) subjectStats[subjectId].correct++;
+        }
+      });
+
+      for (const [subjId, stats] of Object.entries(subjectStats)) {
+        try {
+          const { error: rpcError } = await supabase.rpc('upsert_user_statistics', {
+            p_user_id: user.uid,
+            p_subject_id: subjId,
+            p_attempted: stats.attempted,
+            p_correct: stats.correct,
+          });
+          if (rpcError) console.error('Stats update error:', rpcError);
+        } catch (e) {
+          console.error('Stats update error:', e);
+        }
+      }
+
+      // 5. Update XP/Streak (non-fatal)
+      try {
+        const res = await fetch("/api/update-progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.uid, correctCount, attemptedCount, isMockTest: mode === "mock" })
+        });
+        const progressData = await res.json();
+        if (progressData && !progressData.error) {
+          setToastMessage({
+            message: progressData.leveledUp
+              ? `🎉 Level Up! You are now Level ${progressData.newLevel}`
+              : `🔥 ${progressData.newStreak} day streak | +${progressData.xpEarned} XP earned`,
+            isLevelUp: progressData.leveledUp
+          });
+          // Short delay so user sees toast, then redirect
+          setTimeout(() => { router.push(`/results?attempt_id=${attemptId}`); }, 2500);
+          return;
+        }
+      } catch (e) {
+        console.error('Progress update failed (non-fatal):', e);
+      }
+
+      // ✅ Always redirect to results
+      console.log('Redirecting to results:', attemptId);
+      router.push(`/results?attempt_id=${attemptId}`);
+
+    } catch (error) {
+      console.error('=== SUBMIT FAILED ===', error);
+      alert(
+        'Test submission failed.\n\n' +
+        'Error: ' + String(error) +
+        '\n\nPlease check the browser console (F12) and share the error with support.'
+      );
+      setSubmitting(false);
+      // DO NOT redirect anywhere on error
+    }
+  }, [submitting, questions, answers, user, testId, mode, timeLeft, questionStatus, router]);
 
   useEffect(() => {
     timerRef.current = setInterval(() => {
