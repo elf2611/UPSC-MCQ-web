@@ -354,7 +354,7 @@ export default function ResultsInner() {
             <div className="divide-y divide-zinc-800/60">
               {filteredAnswers.length === 0 ? (
                 <p className="text-zinc-500 text-center py-12">No {filter.toLowerCase()} questions found.</p>
-              ) : filteredAnswers.map((ans, index) => {
+              ) : filteredAnswers.map((ans) => {
                 const originalIndex = answers.findIndex(a => a.question_id === ans.question_id);
                 return (
                   <div key={ans.question_id} className="p-4 sm:p-6 hover:bg-zinc-800/20 transition-colors">
