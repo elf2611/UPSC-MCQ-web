@@ -86,6 +86,7 @@ export default function ResultsInner() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
   
   // New States
   const [queueing, setQueueing] = useState(false);
@@ -101,30 +102,80 @@ export default function ResultsInner() {
         return;
       }
       
-      const { data: a } = await supabase.from("test_attempts").select("*").eq("id", attemptId).single();
-      if (!a) {
-        router.push('/');
-        return;
-      }
+      try {
+        const { data: attemptData, error: attemptError } = await supabase
+          .from("test_attempts")
+          .select("*")
+          .eq("id", attemptId)
+          .eq("user_id", user.uid)
+          .single();
 
-      if (a.user_id !== user.uid) {
-        router.push('/');
-        return;
-      }
+        if (attemptError || !attemptData) {
+          console.error('Attempt fetch error:', attemptError);
+          setErrorMsg('Results not found. The test may not have saved correctly.');
+          setLoading(false);
+          return;
+        }
 
-      setAttempt(a);
-      const { data: ans } = await supabase.from("attempt_answers").select("*, questions(*)").eq("attempt_id", attemptId);
-      if (ans) { 
-        setAnswers(ans); 
+        setAttempt(attemptData);
+
+        const { data: answersData, error: answersError } = await supabase
+          .from("attempt_answers")
+          .select(`
+            *,
+            questions (
+              id,
+              question_text,
+              option_a,
+              option_b,
+              option_c,
+              option_d,
+              correct_option,
+              explanation,
+              why_a_wrong,
+              why_b_wrong,
+              why_c_wrong,
+              why_d_wrong,
+              elimination_tip,
+              static_topic_link,
+              subject,
+              topic,
+              difficulty
+            )
+          `)
+          .eq("attempt_id", attemptId);
+
+        if (answersError) {
+          console.error('Answers fetch error:', answersError);
+        }
+
+        setAnswers(answersData || []);
+      } catch (err) {
+        console.error('Results fetch error:', err);
+        setErrorMsg('Something went wrong loading results.');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, [attemptId, user, router]);
 
-  if (loading || !attempt) return (
+  if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#121212]">
       <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (errorMsg || !attempt) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#121212]">
+      <div className="bg-[#1a1a1a] border border-red-500/30 p-8 rounded-2xl max-w-md text-center">
+        <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-white mb-2">Error Loading Results</h2>
+        <p className="text-gray-400 mb-6">{errorMsg || 'Could not load the results for this test.'}</p>
+        <Link href="/" className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
+          Go to Dashboard
+        </Link>
+      </div>
     </div>
   );
 

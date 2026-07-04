@@ -2,14 +2,89 @@
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect } from "react";
-import { Filter, BookOpen, ChevronRight } from "lucide-react";
+import { Filter, BookOpen, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+
+function PracticeTestModal({ onClose, onStart, subjectName }: { onClose: () => void; onStart: (cfg: { mode: string, count: number, difficulty: string }) => void; subjectName: string }) {
+  const [mode, setMode] = useState<"practice" | "test">("practice");
+  const [count, setCount] = useState(20);
+  const [difficulty, setDifficulty] = useState("Medium");
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-white">Start {subjectName} Practice</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Mode</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setMode("practice")}
+              className={`py-2 rounded-lg text-sm font-bold border transition-colors ${mode === "practice" ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/30'}`}
+            >
+              Practice (Feedback)
+            </button>
+            <button
+              onClick={() => setMode("test")}
+              className={`py-2 rounded-lg text-sm font-bold border transition-colors ${mode === "test" ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/30'}`}
+            >
+              Test (No Feedback)
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Question Count</h3>
+          <div className="grid grid-cols-4 gap-2">
+            {[10, 20, 30, 50].map(n => (
+              <button
+                key={n}
+                onClick={() => setCount(n)}
+                className={`py-2 rounded-lg text-sm font-bold border transition-colors ${count === n ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/30'}`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Difficulty</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {["All Levels", "Easy", "Medium", "Hard"].map(diff => (
+              <button
+                key={diff}
+                onClick={() => setDifficulty(diff)}
+                className={`py-2 rounded-lg text-sm font-bold border transition-colors ${difficulty === diff ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/30'}`}
+              >
+                {diff}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={() => onStart({ mode, count, difficulty })}
+          className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-bold hover:bg-primary/90 transition-colors"
+        >
+          Begin Session
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function PracticeTestsPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [modalSubject, setModalSubject] = useState<string | null>(null);
   
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['Polity', 'History']);
   const [difficulty, setDifficulty] = useState("Medium");
@@ -121,8 +196,15 @@ export default function PracticeTestsPage() {
     );
   }
 
+  const handleStart = (cfg: { mode: string, count: number, difficulty: string }) => {
+    if (modalSubject) {
+      router.push(`/test-interface?mode=${cfg.mode}&subject=${encodeURIComponent(modalSubject)}&count=${cfg.count}&difficulty=${encodeURIComponent(cfg.difficulty)}`);
+    }
+  };
+
   return (
     <ProtectedRoute>
+      {modalSubject && <PracticeTestModal subjectName={modalSubject} onClose={() => setModalSubject(null)} onStart={handleStart} />}
       <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
         
         {/* Left Sidebar Filters */}
@@ -204,13 +286,13 @@ export default function PracticeTestsPage() {
                   </div>
                   
                   {(topic.totalQs as number) > 0 ? (
-                    <Link 
-                      href={`/test-interface?mode=practice&subject=${encodeURIComponent(topic.name as string)}&difficulty=${encodeURIComponent(difficulty)}`}
+                    <button 
+                      onClick={() => setModalSubject(topic.name as string)}
                       className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-semibold bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors border border-primary/20"
                     >
                       {(topic.attempted as number) > 0 ? "Continue Practice" : "Start Practice"}
                       <ChevronRight className="w-4 h-4" />
-                    </Link>
+                    </button>
                   ) : (
                     <button 
                       disabled

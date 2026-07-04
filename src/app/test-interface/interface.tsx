@@ -95,11 +95,11 @@ export default function TestInterfaceInner() {
         let data: Question[] | null = null;
         let query = supabase.from("questions").select("*");
 
-        if (mode === "practice") {
+        if (mode === "practice" || mode === "test") {
           if (subject) query = query.eq("subject", subject);
           if (topic) query = query.eq("topic", topic);
           if (difficulty && difficulty !== "All Levels") query = query.eq("difficulty", difficulty);
-          query = query.limit(50);
+          query = query.limit(customCount);
           setTestName(topic ? `${topic} Practice` : `${subject} Practice`);
           setTimeLeft(3600);
         } else if (mode === "mock" && testId) {
@@ -161,7 +161,11 @@ export default function TestInterfaceInner() {
       }
     });
     score = Math.round(score * 100) / 100;
-    const attemptedCount = Object.keys(answers).length;
+    const unattempted = questions.length - attemptedCount;
+    // Calculate total marks (assume 2 marks per question)
+    const totalMarks = questions.length * 2;
+    const accuracy = attemptedCount > 0 ? Math.round((correctCount / attemptedCount) * 100) : 0;
+    const timeTaken = customTime ? customTime - timeLeft : (mode === 'mock' ? 7200 : 3600) - timeLeft;
 
     try {
       if (user) {
@@ -173,65 +177,110 @@ export default function TestInterfaceInner() {
             test_id: testId || null,
             mode,
             score,
-            total_questions: questions.length,
-            attempted: attemptedCount,
-            time_taken: timeLeft,
+            total_marks: totalMarks,
+            correct_count: correctCount,
+            wrong_count: attemptedCount - correctCount,
+            unattempted_count: unattempted,
+            accuracy_percent: accuracy,
+            time_taken_seconds: timeTaken,
+            started_at: new Date(Date.now() - timeTaken * 1000).toISOString(),
+            submitted_at: new Date().toISOString(),
           })
           .select()
           .single();
 
-        if (!error && attemptData) {
-          const rows = Object.entries(answers).map(([qId, opt]) => ({
-            attempt_id: attemptData.id,
-            question_id: qId,
-            selected_option: opt,
-            is_correct: opt === questions.find(q => q.id === qId)?.correct_option,
-          }));
-          await supabase.from("attempt_answers").insert(rows);
-
-          // 2. Update XP and Streak
-          try {
-            const res = await fetch("/api/update-progress", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: user.uid,
-                correctCount,
-                attemptedCount,
-                isMockTest: mode === "mock"
-              })
-            });
-            const progressData = await res.json();
-            
-            if (progressData && !progressData.error) {
-              setToastMessage({
-                message: progressData.leveledUp 
-                  ? `🎉 Level Up! You are now Level ${progressData.newLevel}` 
-                  : `🔥 ${progressData.newStreak} day streak | +${progressData.xpEarned} XP earned`,
-                isLevelUp: progressData.leveledUp
-              });
-              
-              // Wait a moment so user can see toast before redirect
-              setTimeout(() => {
-                router.push(`/results?attempt_id=${attemptData.id}`);
-              }, 3000);
-              return;
-            }
-          } catch (e) {
-            console.error("Progress update failed:", e);
-          }
-          
-          router.push(`/results?attempt_id=${attemptData.id}`);
-          return;
+        if (error) {
+          console.error("Attempt save error:", error);
+          throw new Error('Failed to save attempt: ' + error.message);
         }
+        
+        const attemptId = attemptData.id;
+
+        // Save individual answers
+        const answerRows = questions.map(q => ({
+          attempt_id: attemptId,
+          question_id: q.id,
+          selected_option: answers[q.id] || null,
+          is_correct: answers[q.id] === q.correct_option,
+          time_spent_seconds: 0, // Using 0 as placeholder since per-question time isn't tracked yet
+          marked_for_review: questionStatus[q.id] === 'marked-for-review' || questionStatus[q.id] === 'answered-and-marked',
+        }));
+
+        const { error: answersError } = await supabase
+          .from('attempt_answers')
+          .insert(answerRows);
+
+        if (answersError) {
+          console.error('Answers save error:', answersError);
+        }
+
+        // Update user_statistics per subject
+        const subjectStats: Record<string, {correct: number, attempted: number}> = {};
+        
+        questions.forEach(q => {
+          const subjectId = q.subject_id || q.subject || 'unknown';
+          if (!subjectStats[subjectId]) {
+            subjectStats[subjectId] = { correct: 0, attempted: 0 };
+          }
+          if (answers[q.id]) {
+            subjectStats[subjectId].attempted++;
+            if (answers[q.id] === q.correct_option) {
+              subjectStats[subjectId].correct++;
+            }
+          }
+        });
+
+        for (const [subjId, stats] of Object.entries(subjectStats)) {
+          await supabase.rpc('upsert_user_statistics', {
+            p_user_id: user.uid,
+            p_subject_id: subjId,
+            p_attempted: stats.attempted,
+            p_correct: stats.correct,
+          }).catch((e: unknown) => console.error('Stats update error:', e));
+        }
+
+        // 2. Update XP and Streak
+        try {
+          const res = await fetch("/api/update-progress", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.uid,
+              correctCount,
+              attemptedCount,
+              isMockTest: mode === "mock"
+            })
+          });
+          const progressData = await res.json();
+          
+          if (progressData && !progressData.error) {
+            setToastMessage({
+              message: progressData.leveledUp 
+                ? `🎉 Level Up! You are now Level ${progressData.newLevel}` 
+                : `🔥 ${progressData.newStreak} day streak | +${progressData.xpEarned} XP earned`,
+              isLevelUp: progressData.leveledUp
+            });
+            
+            // Wait a moment so user can see toast before redirect
+            setTimeout(() => {
+              router.push(`/results?attempt_id=${attemptId}`);
+            }, 3000);
+            return;
+          }
+        } catch (e) {
+          console.error("Progress update failed:", e);
+        }
+        
+        router.push(`/results?attempt_id=${attemptId}`);
+        return;
       }
     } catch (err) {
-      console.error(err);
+      console.error('Submit error:', err);
     }
 
     sessionStorage.setItem("last_score", JSON.stringify({ score, total: questions.length, attempted: attemptedCount }));
     router.push("/results");
-  }, [submitting, questions, answers, user, testId, mode, timeLeft, router]);
+  }, [submitting, questions, answers, user, testId, mode, timeLeft, customTime, questionStatus, router]);
 
   useEffect(() => {
     timerRef.current = setInterval(() => {
@@ -432,7 +481,7 @@ export default function TestInterfaceInner() {
               </div>
 
               {/* Feedback Panels */}
-              {feedbackMode && (
+              {mode === 'practice' && feedbackMode && (
                 <div className="flex flex-col gap-4 mt-4 animate-in slide-in-from-bottom-4 fade-in duration-300">
                   {/* Panel 1: Result */}
                   <div className={`p-4 rounded-xl border ${isCorrect ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
@@ -498,7 +547,7 @@ export default function TestInterfaceInner() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3 items-center justify-between flex-shrink-0 pt-4 pb-10">
-                {!feedbackMode ? (
+                {!(mode === 'practice' && feedbackMode) ? (
                   <>
                     <div className="flex gap-2 flex-wrap">
                       <button onClick={handleMarkForReview} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors">
@@ -512,16 +561,28 @@ export default function TestInterfaceInner() {
                       <button onClick={() => setCurrentIndex(i => Math.max(0, i - 1))} disabled={currentIndex === 0} className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white disabled:opacity-40 transition-colors">
                         <ChevronLeft className="w-4 h-4" /> Prev
                       </button>
-                      <button onClick={handleSaveAndNext} className="flex items-center gap-1 px-6 py-2 rounded-lg text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                        Save & Next <ChevronRight className="w-4 h-4" />
-                      </button>
+                      {currentIndex < questions.length - 1 ? (
+                        <button onClick={handleSaveAndNext} className="flex items-center gap-1 px-6 py-2 rounded-lg text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                          {mode === 'practice' && answers[currentQ.id] ? 'Check Answer' : 'Save & Next'} <ChevronRight className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button onClick={handleSubmit} className="flex items-center gap-1 px-6 py-2 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 transition-colors">
+                          Submit Test <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </>
                 ) : (
                   <div className="w-full flex justify-end">
-                    <button onClick={() => { setCurrentIndex(i => i + 1); setFeedbackMode(false); }} className="flex items-center gap-1 px-8 py-3 rounded-lg text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors w-full md:w-auto justify-center">
-                      Next Question <ChevronRight className="w-4 h-4" />
-                    </button>
+                    {currentIndex < questions.length - 1 ? (
+                      <button onClick={() => { setCurrentIndex(i => i + 1); setFeedbackMode(false); }} className="flex items-center gap-1 px-8 py-3 rounded-lg text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors w-full md:w-auto justify-center">
+                        Next Question <ChevronRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button onClick={handleSubmit} className="flex items-center gap-1 px-8 py-3 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 transition-colors w-full md:w-auto justify-center">
+                        Submit Test <CheckCircle2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

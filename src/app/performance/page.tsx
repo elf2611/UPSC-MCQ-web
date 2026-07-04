@@ -109,8 +109,8 @@ export default function PerformancePage() {
       const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
 
       const { data: hData, count } = await supabase
-        .from("question_attempts")
-        .select("attempt_date", { count: 'exact' })
+        .from("attempt_answers")
+        .select("created_at", { count: 'exact' })
         .eq("user_id", user.uid);
       
       setTotalPracticed(count || 0);
@@ -118,8 +118,11 @@ export default function PerformancePage() {
       if (hData) {
         const counts: Record<string, number> = {};
         hData.forEach(row => {
-          if (row.attempt_date >= ninetyStr) {
-            counts[row.attempt_date] = (counts[row.attempt_date] || 0) + 1;
+          if (row.created_at) {
+            const d = row.created_at.split("T")[0];
+            if (d >= ninetyStr) {
+              counts[d] = (counts[d] || 0) + 1;
+            }
           }
         });
         setHeatmapMap(counts);
@@ -129,8 +132,7 @@ export default function PerformancePage() {
       const { data: statData } = await supabase
         .from("user_statistics")
         .select("total_attempted, total_correct")
-        .eq("user_id", user.uid)
-        .is("topic_id", null);
+        .eq("user_id", user.uid);
 
       if (statData && statData.length > 0) {
         const tAttempted = statData.reduce((acc, row) => acc + row.total_attempted, 0);
@@ -141,19 +143,18 @@ export default function PerformancePage() {
       // 4. Fetch Weak Topics
       const { data: weakData } = await supabase
         .from("user_statistics")
-        .select("accuracy_percent, total_attempted, topics(name, slug), subjects(name, slug)")
+        .select("accuracy_percent, total_attempted, subject_id")
         .eq("user_id", user.uid)
-        .not("topic_id", "is", null)
-        .gte("total_attempted", 5)
+        .gte("total_attempted", 2) // set low for testing
         .order("accuracy_percent", { ascending: true })
         .limit(5);
 
       if (weakData) {
         setWeakTopics(weakData.map(w => ({
-          topic_name: (w.topics as { name?: string })?.name || "Unknown Topic",
-          topic_slug: (w.topics as { slug?: string })?.slug || "",
-          subject_name: (w.subjects as { name?: string })?.name || "Unknown Subject",
-          subject_slug: (w.subjects as { slug?: string })?.slug || "",
+          topic_name: w.subject_id || "Unknown Subject",
+          topic_slug: "",
+          subject_name: w.subject_id || "Unknown Subject",
+          subject_slug: "",
           accuracy: Number(w.accuracy_percent),
           attempted: Number(w.total_attempted)
         })));

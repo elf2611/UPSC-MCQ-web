@@ -274,16 +274,18 @@ export default function ProfilePage() {
                             </div>
                           </td>
                         </tr>
-                      ) : history.map(t => {
+                      ) : history.map((t, idx) => {
                         const score = (t.score as number) || 0;
-                        const total = (t.total as number) || 200;
-                        const pct = Math.round((score / total) * 100);
+                        const total = (t.total_marks as number) || (t.total_questions ? (t.total_questions as number) * 2 : 200);
+                        const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+                        const testName = t.test_id ? `Mock Test ${t.test_id}` : `Practice Session ${history.length - idx}`;
+                        const dateStr = t.created_at ? new Date(t.created_at as string).toLocaleDateString() : "—";
                         return (
                           <tr key={t.id as string} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="py-3.5 pr-4 text-gray-300 font-medium">{t.name as string}</td>
-                            <td className="py-3.5 pr-4 text-gray-500 text-xs whitespace-nowrap">{(t.date as string) || "—"}</td>
+                            <td className="py-3.5 pr-4 text-gray-300 font-medium">{testName}</td>
+                            <td className="py-3.5 pr-4 text-gray-500 text-xs whitespace-nowrap">{dateStr}</td>
                             <td className="py-3.5 pr-4">
-                              <span className="text-xs bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded capitalize">{t.mode as string}</span>
+                              <span className="text-xs bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded capitalize">{(t.mode as string) || 'practice'}</span>
                             </td>
                             <td className="py-3.5 pr-4 text-center">
                               <span className={`font-bold ${pct >= 60 ? "text-green-400" : pct >= 40 ? "text-amber-400" : "text-red-400"}`}>{score.toFixed(1)}</span>
