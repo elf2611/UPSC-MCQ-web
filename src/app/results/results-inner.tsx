@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { supabase } from "@/lib/supabase";
@@ -166,6 +166,24 @@ export default function ResultsInner() {
         console.log('Answer count for this attempt:', count)
 
         setAnswers((answersData as unknown as AttemptAnswer[]) || []);
+
+        console.log('=== ANSWER REVIEW DEBUG ===')
+        answersData?.forEach((ans, i) => {
+          console.log(`Q${i+1}:`, {
+            question_id: ans.question_id,
+            selected_option: ans.selected_option,
+            is_correct: ans.is_correct,
+            correct_option: (ans as any).questions?.correct_option,
+            has_question: !!(ans as any).questions,
+          })
+        })
+
+        const correctCount = answersData?.filter(a => a.is_correct === true).length
+        const wrongCount = answersData?.filter(a => a.is_correct === false).length
+        const skippedCount = answersData?.filter(a => !a.selected_option).length
+        console.log('Correct:', correctCount, 
+                    'Wrong:', wrongCount, 
+                    'Skipped:', skippedCount)
       } catch (err) {
         console.error('Results fetch error:', err);
         setErrorMsg('Something went wrong loading results.');
@@ -230,12 +248,35 @@ export default function ResultsInner() {
   }));
 
   // Filtering
-  const filteredAnswers = answers.filter(a => {
-    if (filter === "Correct") return a.is_correct;
-    if (filter === "Incorrect") return !a.is_correct && a.selected_option;
-    if (filter === "Skipped") return !a.selected_option;
-    return true;
-  });
+  const filteredAnswers = useMemo(() => {
+    if (!answers || answers.length === 0) return []
+    
+    switch (filter) {
+      case 'Correct':
+        return answers.filter(ans => 
+          ans.is_correct === true
+        )
+      
+      case 'Incorrect':
+        return answers.filter(ans => 
+          ans.selected_option !== null && 
+          ans.selected_option !== undefined &&
+          ans.selected_option !== '' &&
+          ans.is_correct !== true
+        )
+      
+      case 'Skipped':
+        return answers.filter(ans => 
+          !ans.selected_option || 
+          ans.selected_option === null ||
+          ans.selected_option === ''
+        )
+      
+      case 'All':
+      default:
+        return answers
+    }
+  }, [answers, filter]);
 
   return (
     <ProtectedRoute>
@@ -368,7 +409,21 @@ export default function ResultsInner() {
             {/* Question list */}
             <div className="divide-y divide-zinc-800/60">
               {filteredAnswers.length === 0 ? (
-                <p className="text-zinc-500 text-center py-12">No {filter.toLowerCase()} questions found.</p>
+                <div className="text-center py-12">
+                  <p className="text-zinc-500 text-sm">
+                    {answers?.length === 0 
+                      ? 'Answer data not available for this attempt.'
+                      : `No ${filter.toLowerCase()} questions found.`
+                    }
+                  </p>
+                  {answers?.length === 0 && (
+                    <p className="text-zinc-600 text-xs mt-2">
+                      This can happen if the test was submitted 
+                      before answers were saved. Future tests will 
+                      show the full review.
+                    </p>
+                  )}
+                </div>
               ) : filteredAnswers.map((ans) => {
                 const originalIndex = answers.findIndex(a => a.question_id === ans.question_id);
                 return (

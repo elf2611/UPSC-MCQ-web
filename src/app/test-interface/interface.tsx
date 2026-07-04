@@ -193,13 +193,28 @@ export default function TestInterfaceInner() {
       }
 
       // 2. Save via server route (uses service role key, bypasses schema cache + RLS)
-      const answerRows = questions.map(q => ({
-        question_id: q.id,
-        selected_option: answers[q.id] || null,
-        is_correct: answers[q.id] ? answers[q.id].toLowerCase().trim() === q.correct_option?.toLowerCase().trim() : false,
-        time_spent_seconds: 0,
-        marked_for_review: questionStatus[q.id] === 'marked-for-review' || questionStatus[q.id] === 'answered-and-marked',
-      }));
+      const answerRows = questions.map(q => {
+        const userAnswer = answers[q.id]
+        const correctAnswer = q.correct_option
+        
+        // Explicit boolean — never null
+        let isCorrect = false
+        if (userAnswer && correctAnswer) {
+          isCorrect = userAnswer.toLowerCase().trim() === 
+                      correctAnswer.toLowerCase().trim()
+        }
+        
+        console.log(`Q ${q.id}: user="${userAnswer}" correct="${correctAnswer}" isCorrect=${isCorrect}`)
+        
+        return {
+          attempt_id: attemptId,
+          question_id: q.id,
+          selected_option: userAnswer || null,
+          is_correct: isCorrect, // explicit true/false
+          time_spent_seconds: 0,
+          marked_for_review: questionStatus[q.id] === 'marked-for-review' || questionStatus[q.id] === 'answered-and-marked',
+        }
+      })
 
       const response = await fetch('/api/submit-test', {
         method: 'POST',
