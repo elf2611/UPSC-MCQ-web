@@ -474,7 +474,7 @@ export default function TestInterfaceInner() {
               <div className="flex flex-col gap-3 flex-shrink-0">
                 {(["A", "B", "C", "D"] as const).map(opt => {
                   const text = currentQ[`option_${opt.toLowerCase()}` as keyof Question] as string;
-                  const isSelected = answers[currentQ.id] === opt;
+                  const isSelected = answers[currentQ.id]?.toLowerCase() === opt.toLowerCase();
                   const showAsCorrect = feedbackMode && opt === currentQ.correct_option;
                   const showAsWrong = feedbackMode && isSelected && !isCorrect;
 

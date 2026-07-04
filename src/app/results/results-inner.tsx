@@ -173,7 +173,9 @@ export default function ResultsInner() {
             question_id: ans.question_id,
             selected_option: ans.selected_option,
             is_correct: ans.is_correct,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             correct_option: (ans as any).questions?.correct_option,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             has_question: !!(ans as any).questions,
           })
         })
