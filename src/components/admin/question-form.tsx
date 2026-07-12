@@ -114,7 +114,7 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
               <option value="">Select Subject</option>
               {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
-            {form.formState.errors.subject && <p className="text-red-400 text-xs mt-1">{form.formState.errors.subject.message}</p>}
+            {form.formState.errors.subject && <p className="text-red-400 text-xs mt-1">{form.formState.errors.subject.message as string}</p>}
           </div>
 
           <div>
@@ -125,7 +125,7 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
                 <option key={t.id} value={t.name}>{t.name}</option>
               ))}
             </select>
-            {form.formState.errors.topic && <p className="text-red-400 text-xs mt-1">{form.formState.errors.topic.message}</p>}
+            {form.formState.errors.topic && <p className="text-red-400 text-xs mt-1">{form.formState.errors.topic.message as string}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -204,7 +204,7 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
             rows={5}
             className="w-full bg-background border border-white/10 rounded-lg p-3 text-white"
           />
-          {form.formState.errors.explanation && <p className="text-red-400 text-xs mt-1">{form.formState.errors.explanation.message}</p>}
+          {form.formState.errors.explanation && <p className="text-red-400 text-xs mt-1">{form.formState.errors.explanation.message as string}</p>}
         </div>
         <div className="space-y-4">
           <div>
