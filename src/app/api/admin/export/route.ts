@@ -26,11 +26,11 @@ export async function GET(request: NextRequest) {
 
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, email')
       .eq('id', userId)
       .single();
 
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

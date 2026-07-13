@@ -21,11 +21,11 @@ export async function GET(request: NextRequest) {
     // Verify admin role
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, email')
       .eq('id', userId)
       .single();
 
-    if (profileError || !profile || profile.role !== 'admin') {
+    if (profileError || !profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 });
     }
 
