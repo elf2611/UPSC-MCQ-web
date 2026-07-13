@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { PDFDocument } from 'pdf-lib';
 import { generateQuestions } from '@/lib/ai/provider';
 import crypto from 'crypto';
+import { verifyAdminToken } from '@/lib/auth-verify';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,7 @@ const supabaseAdmin = createClient(
 
 const requestSchema = z.object({
   jobId: z.string().min(1, 'Job ID is required'),
-  userId: z.string().min(1, 'User ID is required'),
+  userId: z.string().optional(), // kept optional for backwards compatibility
   config: z.any().optional(),
 });
 
@@ -40,6 +41,21 @@ const updateJobStatus = async (jobId: string, message: string) => {
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Verify admin via Firebase ID token
+    const authResult = await verifyAdminToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        {
+          error: authResult.error,
+          detail: process.env.NODE_ENV === 'development' ? authResult.detail : undefined,
+        },
+        { status: authResult.status }
+      );
+    }
+    
+    // We now use the authenticated UID directly
+    const userId = authResult.uid;
+
     const body = await request.json();
     const parsed = requestSchema.safeParse(body);
 
@@ -50,18 +66,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { jobId, userId, config } = parsed.data;
-
-    // 1. Verify admin role
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role, email')
-      .eq('id', userId)
-      .single();
-
-    if (profileError || !profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 });
-    }
+    const { jobId, config } = parsed.data;
 
     // 2. Fetch the job
     const { data: job, error: jobError } = await supabaseAdmin

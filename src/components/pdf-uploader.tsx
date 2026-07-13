@@ -125,10 +125,16 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
   const fetchJobs = useCallback(async (currentUploadId: string) => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/jobs/status?userId=${user.uid}&uploadId=${currentUploadId}`);
+      const token = await getFreshIdToken();
+      const res = await fetch(`/api/jobs/status?uploadId=${currentUploadId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setJobs(data.jobs || []);
+      } else if (res.status === 401 || res.status === 403) {
+        setErrorMsg("Session expired or unauthorized. Please refresh.");
+        setStatus("error");
       }
     } catch (e) {
       console.error("Failed to fetch jobs", e);
@@ -138,11 +144,28 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
   useEffect(() => {
     if (!uploadId || status !== "processing_chunks") return;
 
+    // Fetch immediately
+    fetchJobs(uploadId);
+
     const interval = setInterval(() => {
       fetchJobs(uploadId);
-    }, 5000);
+    }, 4000);
 
-    return () => clearInterval(interval);
+    // Timeout check: if no jobs appear after 10 seconds, show error
+    const timeout = setTimeout(() => {
+      setJobs(prevJobs => {
+        if (prevJobs.length === 0) {
+          setErrorMsg("Processing never started. The server failed to create background jobs.");
+          setStatus("error");
+        }
+        return prevJobs;
+      });
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, [uploadId, status, user, fetchJobs]);
 
   // ORCHESTRATOR: Concurrently process up to 2 chunks
@@ -164,17 +187,21 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     if (activeProcessing < 2 && waitingJobs.length > 0) {
       const jobToProcess = waitingJobs[0];
 
-      setJobs(prev => prev.map(j => j.id === jobToProcess.id ? { ...j, status: 'processing' } : j));
+      setJobs(prev => prev.map(j => j.id === jobToProcess.id ? { ...j, status: 'processing', status_message: 'Starting job...' } : j));
 
-      fetch("/api/process-chunk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobId: jobToProcess.id,
-          userId: user.uid,
-          config: aiConfig
-        })
-      }).then(() => fetchJobs(uploadId)).catch(() => fetchJobs(uploadId));
+      getFreshIdToken().then(token => {
+        fetch("/api/process-chunk", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
+          },
+          body: JSON.stringify({
+            jobId: jobToProcess.id,
+            config: aiConfig
+          })
+        }).then(() => fetchJobs(uploadId)).catch(() => fetchJobs(uploadId));
+      });
     }
   }, [jobs, status, uploadId, user, aiConfig, onExtractionComplete, fetchJobs]);
 
@@ -190,9 +217,6 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     setErrorMsg("");
 
     try {
-      // ── Step 1: Get a fresh Firebase ID token ─────────────────────────────
-      // We force-refresh the token here because the user may have spent time
-      // browsing their file system, letting the 1-hour token expire.
       let idToken: string;
       try {
         idToken = await getFreshIdToken();
@@ -201,12 +225,11 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
         throw new Error(msg);
       }
 
-      // ── Step 2: Get Signed Upload URL ─────────────────────────────────────
       const urlRes = await fetch("/api/get-upload-url", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,      // ← auth token attached here
+          "Authorization": `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           fileName: file.name,
@@ -219,9 +242,6 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
       if (!urlRes.ok) throw new Error(urlData.error || "Failed to get upload URL.");
       const { uploadUrl, storagePath } = urlData;
 
-      // ── Step 3: Upload file directly to Supabase Storage via XHR ─────────
-      // The XHR goes directly to Supabase, not through our server, so
-      // we don't need to set the Authorization header on this request.
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhrRef.current = xhr;
@@ -245,27 +265,22 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
         xhr.send(file);
       });
 
-      // ── Step 4: Register the upload and create processing jobs ────────────
       setStatus("registering");
-
-      // Re-fetch token in case the large file upload took long enough to expire
       const idToken2 = await getFreshIdToken();
 
       const registerRes = await fetch("/api/register-upload", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken2}`,    // ← auth token attached here too
+          "Authorization": `Bearer ${idToken2}`,
         },
-        body: JSON.stringify({ storagePath }),       // no userId in body — server reads from token
+        body: JSON.stringify({ storagePath }),
       });
 
       const registerData = await registerRes.json();
-
       if (!registerRes.ok) throw new Error(registerData.error || "Failed to register upload.");
 
       setUploadId(registerData.uploadId);
-      await fetchJobs(registerData.uploadId);
       setStatus("processing_chunks");
 
     } catch (err: unknown) {
@@ -286,17 +301,26 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     resetState();
   };
 
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+
   const renderJobProgress = () => {
-    if (jobs.length === 0) return null;
+    if (jobs.length === 0) {
+      return (
+        <div className="flex items-center justify-center gap-3 py-6 text-blue-400 font-medium">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Waiting for background jobs to appear...</span>
+        </div>
+      );
+    }
+
     const completed = jobs.filter(j => j.status === 'completed').length;
     const processing = jobs.filter(j => j.status === 'processing').length;
     const failed = jobs.filter(j => j.status === 'failed').length;
     const total = jobs.length;
-
     const percent = Math.round((completed / total) * 100);
 
     return (
-      <div className="space-y-4 w-full">
+      <div className="space-y-4 w-full mt-4">
         <div className="flex justify-between items-center text-sm">
           <span className="font-medium text-foreground">
             Processing Book ({total} parts)
@@ -335,17 +359,51 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
         </div>
 
         {failed > 0 && (
-          <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded">
-            {failed} part(s) failed. Will automatically retry up to 3 times.
+          <div className="text-xs text-red-400 bg-red-500/10 p-3 rounded border border-red-500/20">
+            {failed} part(s) failed. The orchestrator will automatically retry them up to 3 times.
           </div>
         )}
 
-        {jobs.filter(j => j.status === 'processing').slice(0, 3).map(j => (
-          <div key={j.id} className="text-xs text-blue-400 bg-blue-500/10 p-2 rounded flex items-center gap-2">
-            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-            <span className="truncate">Pages {j.chunk_start_page}-{j.chunk_end_page}: {j.status_message || 'Processing...'}</span>
+        <div className="flex flex-col gap-2">
+          {jobs.filter(j => j.status === 'processing').map(j => (
+            <div key={j.id} className="text-xs text-blue-400 bg-blue-500/10 p-3 rounded flex items-center gap-3 border border-blue-500/20">
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+              <span className="truncate font-medium">Pages {j.chunk_start_page}-{j.chunk_end_page}: {j.status_message || 'Processing...'}</span>
+            </div>
+          ))}
+        </div>
+
+        <button 
+          onClick={() => setDetailsExpanded(!detailsExpanded)}
+          className="text-xs text-muted-foreground hover:text-foreground underline decoration-dashed underline-offset-4 mt-2"
+        >
+          {detailsExpanded ? "Hide Details" : "View Detailed Status"}
+        </button>
+
+        {detailsExpanded && (
+          <div className="mt-2 space-y-2 max-h-60 overflow-y-auto pr-2 rounded-lg bg-background/50 border border-white/10 p-3">
+            {jobs.map(j => (
+              <div key={j.id} className="text-xs flex items-start justify-between border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium text-foreground">Pages {j.chunk_start_page}-{j.chunk_end_page}</span>
+                  <span className="text-muted-foreground">{j.status_message || (j.status === 'waiting' ? 'Queued' : j.status)}</span>
+                  {j.error_message && <span className="text-red-400 truncate max-w-[200px]" title={j.error_message}>{j.error_message}</span>}
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={cn("px-2 py-0.5 rounded-full",
+                    j.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                    j.status === 'processing' ? 'bg-blue-500/20 text-blue-400' :
+                    j.status === 'waiting' ? 'bg-white/10 text-zinc-400' :
+                    'bg-red-500/20 text-red-400'
+                  )}>
+                    {j.status}
+                  </span>
+                  {j.questions_generated > 0 && <span className="text-green-400">+{j.questions_generated} Qs</span>}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     );
   };
@@ -429,14 +487,14 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
           {status === "processing_chunks" && renderJobProgress()}
 
           {status === "success" && (
-            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex items-center justify-between">
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex items-center justify-between mt-4">
               <span className="text-green-400 font-medium">Processing complete! Questions saved to staging.</span>
               <button onClick={resetState} className="text-sm px-4 py-2 bg-white/5 hover:bg-white/10 rounded-md">Upload Another</button>
             </div>
           )}
 
           {status === "error" && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex flex-col gap-2">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex flex-col gap-2 mt-4">
               <div className="flex items-start gap-2 text-red-400">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <span className="text-sm font-medium">{errorMsg}</span>
@@ -445,7 +503,7 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 mt-4">
             {status === "idle" && (
               <button
                 onClick={handleUpload}
