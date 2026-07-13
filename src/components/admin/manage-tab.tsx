@@ -69,8 +69,8 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (err: any) {
-      alert("Failed to export: " + err.message);
+    } catch (err: unknown) {
+      alert("Failed to export: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setExporting(null);
     }

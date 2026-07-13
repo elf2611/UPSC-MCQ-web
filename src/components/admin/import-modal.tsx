@@ -18,7 +18,7 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void, onIm
     setSuccess("");
 
     try {
-      let data: any[] = [];
+      let data: Record<string, unknown>[] = [];
       const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
       const isCsv = file.name.endsWith(".csv");
 
@@ -27,8 +27,8 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void, onIm
       if (isCsv) {
         const text = await file.text();
         const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+        data = result.data as Record<string, unknown>[];
         if (result.errors.length > 0) throw new Error(`CSV Parsing Error: ${result.errors[0].message}`);
-        data = result.data;
       } else if (isExcel) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: "array" });
@@ -46,7 +46,7 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void, onIm
       }
 
       // Convert data to match backend expectations
-      const payload = data.map(row => ({
+      const payload = data.map((row: Record<string, unknown>) => ({
         ...row,
         // Ensure string conversions where necessary, handling Excel quirks
         tags: row.tags ? (typeof row.tags === 'string' ? row.tags.split(',').map((t: string) => t.trim()) : row.tags) : [],
@@ -77,8 +77,8 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void, onIm
         }, 2000);
       }
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }

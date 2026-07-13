@@ -12,7 +12,6 @@ import { QuestionForm, QuestionFormValues } from "@/components/admin/question-fo
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "add" | "manage" | "subjects" | "generator">("dashboard");
-  const [loading, setLoading] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuestionFormValues | null>(null);
   const { user } = useAuth();
 
@@ -285,7 +284,7 @@ export default function AdminPage() {
             setEditingQuestion({
               ...q,
               tags: q.tags ? (q.tags as string[]).join(", ") : "",
-            } as any);
+            } as unknown as QuestionFormValues);
             setActiveTab("add");
           }} />
         )}
@@ -623,7 +622,7 @@ export default function AdminPage() {
                                   setEditingQuestion({
                                     ...q,
                                     tags: q.tags ? (q.tags as string[]).join(", ") : "",
-                                  } as any);
+                                  } as unknown as QuestionFormValues);
                                   setActiveTab("add");
                                 }}
                                 className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"

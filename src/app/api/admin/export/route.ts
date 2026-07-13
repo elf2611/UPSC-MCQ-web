@@ -48,8 +48,10 @@ export async function GET(request: NextRequest) {
 
     // Clean data (remove FTS column or unnecessary internal fields if needed)
     const exportData = questions.map(q => {
-      const { fts, question_hash, ...rest } = q;
-      return rest;
+      const copy = { ...q };
+      delete copy.fts;
+      delete copy.question_hash;
+      return copy;
     });
 
     const timestamp = new Date().toISOString().split('T')[0];

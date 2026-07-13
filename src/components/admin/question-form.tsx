@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Save, Loader2, RefreshCcw } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export const questionSchema = z.object({
@@ -40,8 +40,8 @@ export type QuestionFormValues = z.infer<typeof questionSchema>;
 
 interface QuestionFormProps {
   initialData?: QuestionFormValues;
-  subjects: any[];
-  topics: any[];
+  subjects: Record<string, unknown>[];
+  topics: Record<string, unknown>[];
   userId: string;
   onSuccess: () => void;
   onCancel: () => void;
@@ -51,8 +51,8 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const form = useForm<any>({
-    resolver: zodResolver(questionSchema),
+  const form = useForm<QuestionFormValues>({
+    resolver: zodResolver(questionSchema) as unknown as Resolver<QuestionFormValues>,
     defaultValues: initialData || {
       difficulty: "medium",
       year: new Date().getFullYear(),
@@ -89,8 +89,8 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
       }
       
       onSuccess();
-    } catch (err: any) {
-      setErrorMsg(err.message);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -99,7 +99,7 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
   const isEdit = !!initialData?.id;
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-6 bg-card p-6 rounded-xl border border-white/10">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 bg-card p-6 rounded-xl border border-white/10">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-white">{isEdit ? "Edit Question" : "Add New Question"}</h2>
         {errorMsg && <div className="text-red-400 text-sm bg-red-400/10 px-3 py-1 rounded">{errorMsg}</div>}
@@ -112,7 +112,7 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
             <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
             <select {...form.register("subject")} className="w-full bg-background border border-white/10 rounded-lg p-2.5 text-white">
               <option value="">Select Subject</option>
-              {subjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              {subjects.map(s => <option key={s.id as string} value={s.name as string}>{s.name as string}</option>)}
             </select>
             {form.formState.errors.subject && <p className="text-red-400 text-xs mt-1">{form.formState.errors.subject.message as string}</p>}
           </div>
@@ -122,7 +122,7 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
             <select {...form.register("topic")} className="w-full bg-background border border-white/10 rounded-lg p-2.5 text-white">
               <option value="">Select Topic</option>
               {topics.filter(t => t.subject_id === subjects.find(s => s.name === form.watch("subject"))?.id).map(t => (
-                <option key={t.id} value={t.name}>{t.name}</option>
+                <option key={t.id as string} value={t.name as string}>{t.name as string}</option>
               ))}
             </select>
             {form.formState.errors.topic && <p className="text-red-400 text-xs mt-1">{form.formState.errors.topic.message as string}</p>}
@@ -171,13 +171,13 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
               <label className="text-sm font-semibold text-white uppercase">Option {opt} {form.watch('correct_option') === opt && '(Correct)'}</label>
             </div>
             <textarea 
-              {...form.register(`option_${opt}` as any)} 
+              {...form.register(`option_${opt}` as keyof QuestionFormValues)} 
               rows={2}
               className="w-full bg-background border border-white/10 rounded-lg p-2 text-sm text-white"
               placeholder={`Text for Option ${opt.toUpperCase()}`}
             />
             {form.formState.errors[`option_${opt}` as keyof QuestionFormValues] && (
-              <p className="text-red-400 text-xs mt-1">{(form.formState.errors[`option_${opt}` as keyof QuestionFormValues] as any)?.message}</p>
+              <p className="text-red-400 text-xs mt-1">{form.formState.errors[`option_${opt}` as keyof QuestionFormValues]?.message as string}</p>
             )}
             
             {/* Extended: Specific Option Explanation */}
@@ -185,7 +185,7 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
               <div className="mt-2">
                 <input 
                   type="text" 
-                  {...form.register(`option_${opt}_explanation` as any)} 
+                  {...form.register(`option_${opt}_explanation` as keyof QuestionFormValues)} 
                   placeholder={`Why is ${opt.toUpperCase()} wrong? (Optional)`}
                   className="w-full bg-background/50 border border-white/10 rounded p-1.5 text-xs text-gray-300" 
                 />
