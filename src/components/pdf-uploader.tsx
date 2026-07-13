@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { UploadCloud, File as FileIcon, X, AlertCircle, CheckCircle2, RotateCcw, Loader2, Play } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { auth } from "@/lib/firebase";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -25,20 +26,37 @@ export interface Job {
 interface PdfUploaderProps {
   onExtractionComplete: (questionsCount: number) => void;
   className?: string;
-  aiConfig?: Record<string, unknown>; // The config for generating questions
+  aiConfig?: Record<string, unknown>;
 }
 
 type UploadStatus = "idle" | "uploading" | "registering" | "processing_chunks" | "success" | "error";
 
+const MAX_FILE_SIZE_BYTES = 150 * 1024 * 1024; // 150MB
+const MAX_FILE_SIZE_MB = 150;
+
+/**
+ * Get a fresh Firebase ID token for the current user.
+ * Passing `true` forces a token refresh — important because the user may
+ * have had the file picker open for a while, letting the 1-hour token expire.
+ */
+async function getFreshIdToken(): Promise<string> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error("Not logged in. Please sign in and try again.");
+  }
+  // force=true refreshes the token if it has expired or is close to expiry
+  return currentUser.getIdToken(true);
+}
+
 export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUploaderProps) {
   const { user } = useAuth();
-  
+
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [isDragActive, setIsDragActive] = useState(false);
-  
+
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
 
@@ -68,7 +86,11 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     if (selectedFile.size === 0) {
       return "This PDF file is completely empty (0 bytes).";
     }
-    return null; // Valid
+    if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+      const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(1);
+      return `File too large (${sizeMB} MB). Maximum allowed size is ${MAX_FILE_SIZE_MB} MB.`;
+    }
+    return null;
   };
 
   const handleFileSelect = (selectedFile: File) => {
@@ -115,15 +137,15 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
 
   useEffect(() => {
     if (!uploadId || status !== "processing_chunks") return;
-    
+
     const interval = setInterval(() => {
       fetchJobs(uploadId);
     }, 5000);
-    
+
     return () => clearInterval(interval);
   }, [uploadId, status, user, fetchJobs]);
 
-  // 2. ORCHESTRATOR: Concurrently process up to 2 chunks
+  // ORCHESTRATOR: Concurrently process up to 2 chunks
   useEffect(() => {
     if (status !== "processing_chunks" || !uploadId || !user) return;
     if (jobs.length === 0) return;
@@ -132,7 +154,6 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     const activeProcessing = jobs.filter(j => j.status === 'processing').length;
     const waitingJobs = jobs.filter(j => j.status === 'waiting' || (j.status === 'failed' && (j.retry_count || 0) < 3));
 
-    // Check if totally finished
     if (completedJobs.length === jobs.length && jobs.length > 0) {
       setStatus("success");
       const totalQuestions = jobs.reduce((sum, j) => sum + (j.questions_generated || 0), 0);
@@ -142,11 +163,9 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
 
     if (activeProcessing < 2 && waitingJobs.length > 0) {
       const jobToProcess = waitingJobs[0];
-      
-      // Optimistically update UI so we don't fire multiple requests for the same job
+
       setJobs(prev => prev.map(j => j.id === jobToProcess.id ? { ...j, status: 'processing' } : j));
-      
-      // Kick off background worker
+
       fetch("/api/process-chunk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,14 +190,28 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     setErrorMsg("");
 
     try {
-      // 1. Get Signed Upload URL
+      // ── Step 1: Get a fresh Firebase ID token ─────────────────────────────
+      // We force-refresh the token here because the user may have spent time
+      // browsing their file system, letting the 1-hour token expire.
+      let idToken: string;
+      try {
+        idToken = await getFreshIdToken();
+      } catch (tokenErr: unknown) {
+        const msg = tokenErr instanceof Error ? tokenErr.message : "Failed to get auth token.";
+        throw new Error(msg);
+      }
+
+      // ── Step 2: Get Signed Upload URL ─────────────────────────────────────
       const urlRes = await fetch("/api/get-upload-url", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,      // ← auth token attached here
+        },
         body: JSON.stringify({
-          userId: user.uid,
           fileName: file.name,
-          contentType: file.type || "application/pdf"
+          contentType: file.type || "application/pdf",
+          fileSize: file.size,
         }),
       });
 
@@ -186,7 +219,9 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
       if (!urlRes.ok) throw new Error(urlData.error || "Failed to get upload URL.");
       const { uploadUrl, storagePath } = urlData;
 
-      // 2. Upload file directly to Supabase Storage using XMLHttpRequest
+      // ── Step 3: Upload file directly to Supabase Storage via XHR ─────────
+      // The XHR goes directly to Supabase, not through our server, so
+      // we don't need to set the Authorization header on this request.
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhrRef.current = xhr;
@@ -199,10 +234,10 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
 
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`Storage upload failed with status ${xhr.status}`));
+          else reject(new Error(`Storage upload failed with status ${xhr.status}. Try again.`));
         };
 
-        xhr.onerror = () => reject(new Error("Network error occurred during upload."));
+        xhr.onerror = () => reject(new Error("Network error occurred during upload. Check your connection."));
         xhr.onabort = () => reject(new Error("Upload cancelled by user."));
 
         xhr.open("PUT", uploadUrl, true);
@@ -210,20 +245,23 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
         xhr.send(file);
       });
 
-      // 3. Register the upload and create chunks
+      // ── Step 4: Register the upload and create processing jobs ────────────
       setStatus("registering");
-      
+
+      // Re-fetch token in case the large file upload took long enough to expire
+      const idToken2 = await getFreshIdToken();
+
       const registerRes = await fetch("/api/register-upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.uid,
-          storagePath
-        })
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken2}`,    // ← auth token attached here too
+        },
+        body: JSON.stringify({ storagePath }),       // no userId in body — server reads from token
       });
 
       const registerData = await registerRes.json();
-      
+
       if (!registerRes.ok) throw new Error(registerData.error || "Failed to register upload.");
 
       setUploadId(registerData.uploadId);
@@ -248,14 +286,13 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     resetState();
   };
 
-  // Rendering Job Progress
   const renderJobProgress = () => {
     if (jobs.length === 0) return null;
     const completed = jobs.filter(j => j.status === 'completed').length;
     const processing = jobs.filter(j => j.status === 'processing').length;
     const failed = jobs.filter(j => j.status === 'failed').length;
     const total = jobs.length;
-    
+
     const percent = Math.round((completed / total) * 100);
 
     return (
@@ -266,14 +303,14 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
           </span>
           <span className="text-muted-foreground">{percent}%</span>
         </div>
-        
+
         <div className="w-full bg-secondary rounded-full h-2 overflow-hidden flex">
-          <div 
-            className="bg-green-500 h-2 transition-all duration-500 ease-out" 
+          <div
+            className="bg-green-500 h-2 transition-all duration-500 ease-out"
             style={{ width: `${(completed / total) * 100}%` }}
           />
-          <div 
-            className="bg-blue-500 h-2 transition-all duration-500 ease-out animate-pulse" 
+          <div
+            className="bg-blue-500 h-2 transition-all duration-500 ease-out animate-pulse"
             style={{ width: `${(processing / total) * 100}%` }}
           />
         </div>
@@ -303,7 +340,6 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
           </div>
         )}
 
-        {/* Show active job statuses */}
         {jobs.filter(j => j.status === 'processing').slice(0, 3).map(j => (
           <div key={j.id} className="text-xs text-blue-400 bg-blue-500/10 p-2 rounded flex items-center gap-2">
             <Loader2 className="w-3 h-3 animate-spin shrink-0" />
@@ -318,7 +354,7 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     <div className={cn("w-full max-w-3xl mx-auto space-y-4", className)}>
       {/* Upload Zone */}
       {status === "idle" && !file && (
-        <div 
+        <div
           className={cn(
             "border-2 border-dashed rounded-xl p-10 text-center transition-all cursor-pointer flex flex-col items-center gap-4",
             isDragActive ? "border-primary bg-primary/10" : "border-white/20 bg-background/50 hover:bg-white/5 hover:border-white/40"
@@ -330,22 +366,22 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
         >
           <UploadCloud className="w-12 h-12 text-muted-foreground mb-2" />
           <div>
-            <p className="text-lg font-semibold text-foreground">Drag & drop large PDF book here</p>
-            <p className="text-sm text-muted-foreground mt-1">Unlimited size, processes in parallel background chunks.</p>
+            <p className="text-lg font-semibold text-foreground">Drag &amp; drop large PDF book here</p>
+            <p className="text-sm text-muted-foreground mt-1">Up to {MAX_FILE_SIZE_MB} MB · Processes in parallel background chunks</p>
           </div>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            accept=".pdf" 
-            className="hidden" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept=".pdf"
+            className="hidden"
             onChange={(e) => {
               if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
-            }} 
+            }}
           />
         </div>
       )}
 
-      {/* File Selected / Uploading / Processing State */}
+      {/* File Selected / Active State */}
       {(file || status !== "idle") && (
         <div className="bg-background/80 border border-white/10 rounded-xl p-6 flex flex-col gap-6 shadow-xl">
           <div className="flex items-center justify-between">
@@ -375,8 +411,8 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
                 <span className="text-muted-foreground">{progress}%</span>
               </div>
               <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300 ease-out" 
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -386,7 +422,7 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
           {status === "registering" && (
             <div className="flex items-center justify-center gap-3 py-6 text-primary font-medium">
               <Loader2 className="w-6 h-6 animate-spin" />
-              <span>Analyzing massive PDF and queueing background jobs...</span>
+              <span>Analyzing PDF and queueing background jobs...</span>
             </div>
           )}
 
@@ -411,7 +447,7 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3">
             {status === "idle" && (
-              <button 
+              <button
                 onClick={handleUpload}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-all shadow-lg shadow-primary/20"
               >
@@ -420,7 +456,7 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
             )}
 
             {status === "uploading" && (
-              <button 
+              <button
                 onClick={handleCancel}
                 className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-6 py-2.5 rounded-lg font-medium transition-colors"
               >
@@ -430,13 +466,13 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
 
             {status === "error" && (
               <>
-                <button 
+                <button
                   onClick={resetState}
                   className="px-4 py-2 text-sm text-muted-foreground hover:text-white"
                 >
                   Choose Different File
                 </button>
-                <button 
+                <button
                   onClick={handleUpload}
                   className="bg-primary/20 text-primary hover:bg-primary/30 px-6 py-2.5 rounded-lg font-semibold flex items-center gap-2"
                 >

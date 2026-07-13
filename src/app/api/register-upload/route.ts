@@ -5,6 +5,7 @@ import { PDFDocument } from 'pdf-lib';
 import crypto from 'crypto';
 import { handleApiError } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { verifyAdminToken } from '@/lib/auth-verify';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,6 @@ const supabaseAdmin = createClient(
 );
 
 const requestSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
   storagePath: z.string().min(1, 'Storage path is required'),
 });
 
@@ -29,6 +29,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
     }
 
+    // 1. Verify admin via Firebase ID token
+    const authResult = await verifyAdminToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        {
+          error: authResult.error,
+          detail: process.env.NODE_ENV === 'development' ? authResult.detail : undefined,
+        },
+        { status: authResult.status }
+      );
+    }
+
+    const { uid } = authResult;
+
+    // 2. Validate body
     const body = await request.json();
     const parsed = requestSchema.safeParse(body);
 
@@ -39,29 +54,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, storagePath } = parsed.data;
+    const { storagePath } = parsed.data;
 
-    // Verify admin role
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role, email')
-      .eq('id', userId)
-      .single();
-
-    if (profileError || !profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Admin access required.' },
-        { status: 403 }
-      );
-    }
-
-    // Rate Limiting (Prevent abuse of registering dummy uploads)
-    const rateLimit = await checkRateLimit(`register_upload_${userId}`);
+    // 3. Rate Limiting
+    const rateLimit = await checkRateLimit(`register_upload_${uid}`);
     if (!rateLimit.success) {
-      return NextResponse.json({ error: 'Too many upload registrations' }, { status: 429 });
+      return NextResponse.json({ error: 'Too many upload registrations. Please wait.' }, { status: 429 });
     }
 
-    // Download the file from Supabase Storage
+    // 4. Download the file from Supabase Storage
     const { data: fileData, error: downloadError } = await supabaseAdmin
       .storage
       .from('pdf_uploads')
@@ -76,8 +77,8 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await fileData.arrayBuffer();
-    
-    // Empty check
+
+    // 5. Empty check
     if (arrayBuffer.byteLength === 0) {
       await supabaseAdmin.storage.from('pdf_uploads').remove([storagePath]);
       return NextResponse.json(
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Load PDF using pdf-lib to get page count (fast and handles large files well because it doesn't extract text yet)
+    // 6. Load PDF using pdf-lib to get page count
     let pdfDoc;
     try {
       pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
@@ -94,12 +95,12 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.storage.from('pdf_uploads').remove([storagePath]);
       const errMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
       if (errMsg.toLowerCase().includes('password') || errMsg.toLowerCase().includes('encrypt')) {
-        return NextResponse.json({ 
-          error: 'This PDF is password-protected or encrypted. Please unlock it and try again.' 
+        return NextResponse.json({
+          error: 'This PDF is password-protected or encrypted. Please unlock it and try again.'
         }, { status: 422 });
       }
-      return NextResponse.json({ 
-        error: 'The PDF is corrupted or invalid.' 
+      return NextResponse.json({
+        error: 'The PDF is corrupted or invalid.'
       }, { status: 422 });
     }
 
@@ -107,12 +108,12 @@ export async function POST(request: NextRequest) {
 
     if (totalPages === 0) {
       await supabaseAdmin.storage.from('pdf_uploads').remove([storagePath]);
-      return NextResponse.json({ 
-        error: 'The PDF has 0 pages.' 
+      return NextResponse.json({
+        error: 'The PDF has 0 pages.'
       }, { status: 422 });
     }
 
-    // Calculate chunks
+    // 7. Calculate chunks and insert jobs
     const uploadId = crypto.randomUUID();
     const jobsToInsert = [];
 
@@ -120,13 +121,12 @@ export async function POST(request: NextRequest) {
       jobsToInsert.push({
         upload_id: uploadId,
         source_file: storagePath,
-        chunk_start_page: i + 1, // 1-indexed for humans/reference
+        chunk_start_page: i + 1,
         chunk_end_page: Math.min(i + CHUNK_SIZE, totalPages),
         status: 'waiting'
       });
     }
 
-    // Insert jobs into database
     const { error: insertError } = await supabaseAdmin
       .from('processing_jobs')
       .insert(jobsToInsert);
