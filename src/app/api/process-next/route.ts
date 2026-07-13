@@ -1,98 +1,144 @@
+// src/app/api/process-next/route.ts
+//
+// Finds ONE waiting processing_jobs row, atomically claims it (so two
+// concurrent callers can never grab the same job), processes it via
+// chunk-processor.ts, and returns a result describing exactly what happened.
+//
+// Every branch logs a distinct, greppable event_type so Vercel Runtime Logs
+// tell you the truth about what this call actually did.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAdminToken } from '@/lib/auth-verify';
+import { handleApiError } from '@/lib/logger';
 import { processChunk } from '@/lib/chunk-processor';
-import { GenerateRequestConfig } from '@/lib/ai/types';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function log(event_type: string, details: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    route: '/api/process-next',
+    event_type,
+    ...details,
+  }));
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Verify admin via Firebase ID token
+    // 1. Auth
     const authResult = await verifyAdminToken(request);
     if (!authResult.ok) {
-      console.log(`[process-next] Auth failed: ${authResult.error}`);
+      log('auth_failed', { error: authResult.error });
       return NextResponse.json(
         { error: authResult.error },
         { status: authResult.status }
       );
     }
-    const userId = authResult.uid;
 
-    // Optional config passed from client
-    let config: Partial<GenerateRequestConfig> | undefined = undefined;
-    try {
-      const body = await request.json();
-      config = body.config;
-    } catch {
-      // Body is optional - no-op
-    }
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    // 2. Find the oldest waiting job
-    const { data: jobs, error: findError } = await supabaseAdmin
+    // 2. Find ONE candidate waiting job (oldest first).
+    // This SELECT does not claim anything by itself — it's just a candidate.
+    const { data: candidates, error: findError } = await supabaseAdmin
       .from('processing_jobs')
-      .select('id')
+      .select('id, upload_id, source_file, chunk_start_page, chunk_end_page, status')
       .eq('status', 'waiting')
       .order('created_at', { ascending: true })
       .limit(1);
 
     if (findError) {
-      console.error(`[process-next] DB query failed: code=${findError.code} msg=${findError.message} detail=${findError.details}`);
-      return NextResponse.json({ error: 'Failed to query waiting jobs.', detail: findError.message }, { status: 500 });
+      log('find_query_failed', { error: findError.message, details: findError.details, hint: findError.hint });
+      return NextResponse.json({ success: false, reason: 'find_query_failed', detail: findError.message }, { status: 500 });
     }
 
-    if (!jobs || jobs.length === 0) {
-      console.log('[process-next] BRANCH: No waiting jobs found in DB. Stopping loop.');
-      return NextResponse.json({ message: 'No waiting jobs found.' }, { status: 200 });
+    if (!candidates || candidates.length === 0) {
+      log('no_waiting_jobs_found');
+      return NextResponse.json({ success: true, claimed: false, reason: 'no_waiting_jobs' });
     }
 
-    const jobId = jobs[0].id;
-    console.log(`[process-next] BRANCH: Found waiting job id=${jobId}. Attempting atomic claim...`);
+    const candidate = candidates[0];
+    log('candidate_found', { jobId: candidate.id, uploadId: candidate.upload_id, pages: `${candidate.chunk_start_page}-${candidate.chunk_end_page}` });
 
-    // 3. Atomically claim the job.
-    // CRITICAL: Do NOT use .single() — it throws a PGRST116 error if 0 rows are affected,
-    // which is a normal race-condition outcome. Use .select() and check array length instead.
-    const { data: claimedRows, error: claimError } = await supabaseAdmin
+    // 3. ATOMIC CLAIM: update status waiting -> processing, but ONLY if it's
+    // still 'waiting' at the moment of the update. If another request beat us
+    // to it, .eq('status', 'waiting') will match zero rows and we back off.
+    const { data: claimed, error: claimError } = await supabaseAdmin
       .from('processing_jobs')
-      .update({ status: 'processing', status_message: 'Starting job...' })
-      .eq('id', jobId)
-      .eq('status', 'waiting')  // Atomic lock: only updates if still 'waiting'
-      .select('id');
+      .update({ status: 'processing', status_message: 'Claimed, starting extraction...', updated_at: new Date().toISOString() })
+      .eq('id', candidate.id)
+      .eq('status', 'waiting') // <-- this is the race-condition guard
+      .select('id, upload_id, source_file, chunk_start_page, chunk_end_page');
 
     if (claimError) {
-      console.error(`[process-next] BRANCH: Atomic claim UPDATE failed for job id=${jobId}: code=${claimError.code} msg=${claimError.message} detail=${claimError.details} hint=${claimError.hint}`);
-      return NextResponse.json({ error: 'Failed to claim job.', detail: claimError.message }, { status: 500 });
+      log('claim_update_failed', { jobId: candidate.id, error: claimError.message, details: claimError.details, hint: claimError.hint });
+      return NextResponse.json({ success: false, reason: 'claim_update_failed', detail: claimError.message }, { status: 500 });
     }
 
-    if (!claimedRows || claimedRows.length === 0) {
-      console.log(`[process-next] BRANCH: Claim returned 0 rows for job id=${jobId} — another worker grabbed it. Returning 202.`);
-      return NextResponse.json({ message: 'Job was claimed by another worker. Try again.' }, { status: 202 });
+    if (!claimed || claimed.length === 0) {
+      // Someone else claimed it between our SELECT and UPDATE. Not an error.
+      log('claim_lost_race', { jobId: candidate.id });
+      return NextResponse.json({ success: true, claimed: false, reason: 'lost_race_to_another_caller' });
     }
 
-    console.log(`[process-next] BRANCH: Successfully claimed job id=${jobId}. Starting chunk-processor...`);
+    const job = claimed[0];
+    log('claim_succeeded', { jobId: job.id });
 
-    // 4. Process the claimed chunk
+    // 4. Actually process the chunk. This is wrapped so that no matter what
+    // happens inside, the job never ends this request still stuck in
+    // 'processing' with no explanation.
     try {
-      const result = await processChunk(supabaseAdmin, jobId, userId, config);
-      console.log(`[process-next] BRANCH: chunk-processor completed for job id=${jobId}. questions=${result.questionsGenerated} dupes=${result.duplicatesSkipped} rejected=${result.rejected}`);
-      return NextResponse.json(result);
+      const result = await processChunk({
+        jobId: job.id,
+        uploadId: job.upload_id,
+        sourceFile: job.source_file,
+        startPage: job.chunk_start_page,
+        endPage: job.chunk_end_page,
+        supabaseAdmin,
+        onStatus: (msg: string) => log('status_update', { jobId: job.id, message: msg }),
+      });
+
+      log('processing_completed', { jobId: job.id, questionsGenerated: result.questionsGenerated });
+
+      return NextResponse.json({
+        success: true,
+        claimed: true,
+        jobId: job.id,
+        status: 'completed',
+        questionsGenerated: result.questionsGenerated,
+      });
+
     } catch (processErr: unknown) {
-      const msg = processErr instanceof Error ? processErr.message : String(processErr);
-      console.error(`[process-next] BRANCH: chunk-processor threw for job id=${jobId}: ${msg}`);
-      return NextResponse.json({ error: msg }, { status: 500 });
+      const errMsg = processErr instanceof Error ? processErr.message : String(processErr);
+      log('processing_threw', { jobId: job.id, error: errMsg });
+
+      // GUARANTEE the job is marked failed, not left hanging in 'processing'
+      await supabaseAdmin
+        .from('processing_jobs')
+        .update({
+          status: 'failed',
+          error_message: errMsg,
+          status_message: 'Failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      return NextResponse.json({
+        success: true, // the API call itself succeeded; the JOB failed
+        claimed: true,
+        jobId: job.id,
+        status: 'failed',
+        error: errMsg,
+      });
     }
 
-  } catch (error: unknown) {
-    console.error('[process-next] UNHANDLED top-level error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', detail: String(error) },
-      { status: 500 }
-    );
+  } catch (err: unknown) {
+    log('unhandled_error', { error: err instanceof Error ? err.message : String(err) });
+    const errorResponse = handleApiError('/api/process-next', err);
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
