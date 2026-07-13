@@ -1,93 +1,138 @@
 /**
- * Firebase Admin SDK — server-side singleton.
+ * Firebase Admin SDK — lazy singleton for server-side use.
+ *
+ * IMPORTANT: initialization is LAZY (called on first use, not at import time).
+ * This means a missing/malformed env var produces a proper JSON error response
+ * from the API route instead of an HTML crash page.
  *
  * Credential resolution order:
- *   1. FIREBASE_SERVICE_ACCOUNT_JSON  — full service account JSON as a string (recommended)
- *   2. FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY — individual vars
- *   3. NEXT_PUBLIC_FIREBASE_PROJECT_ID alone — project-ID-only mode (token verification
- *      still works via Firebase's public keys, but no other Admin features)
- *
- * If none of the above resolve to a usable credential, the module throws at startup
- * with a clear message rather than silently producing a broken client.
+ *   1. FIREBASE_SERVICE_ACCOUNT_JSON  — full service account JSON as one string
+ *   2. FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY
+ *   3. NEXT_PUBLIC_FIREBASE_PROJECT_ID alone — limited mode (token verify only)
  */
 import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
 
-function getAdminApp(): App {
-  // Singleton — return existing app on hot reloads / repeated imports
-  if (getApps().length > 0) {
-    return getApps()[0];
+// ── Env var validation helper ──────────────────────────────────────────────────
+// Returns a list of descriptive problems found (empty = all good).
+function checkEnvVars(): string[] {
+  const problems: string[] = [];
+
+  const hasJsonBlob = !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const hasIndividual =
+    !!process.env.FIREBASE_PROJECT_ID &&
+    !!process.env.FIREBASE_CLIENT_EMAIL &&
+    !!process.env.FIREBASE_PRIVATE_KEY;
+  const hasProjectIdOnly = !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+  if (!hasJsonBlob && !hasIndividual && !hasProjectIdOnly) {
+    problems.push(
+      'No Firebase Admin credentials found. Set one of:\n' +
+      '  • FIREBASE_SERVICE_ACCOUNT_JSON (full service-account key JSON)\n' +
+      '  • FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY\n' +
+      '  • NEXT_PUBLIC_FIREBASE_PROJECT_ID (limited / token-verify-only mode)'
+    );
   }
 
-  // ── Option 1: Full service account JSON blob ───────────────────────────────
+  if (process.env.FIREBASE_PRIVATE_KEY && !process.env.FIREBASE_PRIVATE_KEY.includes('BEGIN')) {
+    problems.push(
+      'FIREBASE_PRIVATE_KEY appears malformed — it should start with "-----BEGIN RSA PRIVATE KEY-----" ' +
+      'or "-----BEGIN PRIVATE KEY-----". Make sure you copied the full key value from the service account JSON.'
+    );
+  }
+
+  return problems;
+}
+
+// ── Lazy singleton ─────────────────────────────────────────────────────────────
+let _adminApp: App | null = null;
+
+/**
+ * Returns the initialized Firebase Admin App.
+ * Throws a descriptive Error (not an HTML crash) if credentials are missing/malformed.
+ * Call this INSIDE the request handler, never at module top level.
+ */
+function getAdminApp(): App {
+  if (_adminApp) return _adminApp;
+
+  // Return the already-initialized app if another import beat us here
+  if (getApps().length > 0) {
+    _adminApp = getApps()[0];
+    return _adminApp;
+  }
+
+  // ── Option 1: Full service account JSON blob ─────────────────────────────
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (serviceAccountJson) {
-    let serviceAccount: { project_id: string; private_key: string; client_email: string };
+    let sa: { project_id?: string; private_key?: string; client_email?: string };
     try {
-      serviceAccount = JSON.parse(serviceAccountJson) as typeof serviceAccount;
+      sa = JSON.parse(serviceAccountJson) as typeof sa;
     } catch (e) {
       throw new Error(
-        '[firebase-admin] FIREBASE_SERVICE_ACCOUNT_JSON is set but is not valid JSON. ' +
-        'Paste the entire downloaded service-account key file as the env var value. ' +
+        `Server misconfigured: FIREBASE_SERVICE_ACCOUNT_JSON is set but is not valid JSON. ` +
         `Parse error: ${e instanceof Error ? e.message : String(e)}`
       );
     }
+    if (!sa.project_id) throw new Error('Server misconfigured: FIREBASE_SERVICE_ACCOUNT_JSON is missing field "project_id".');
+    if (!sa.client_email) throw new Error('Server misconfigured: FIREBASE_SERVICE_ACCOUNT_JSON is missing field "client_email".');
+    if (!sa.private_key) throw new Error('Server misconfigured: FIREBASE_SERVICE_ACCOUNT_JSON is missing field "private_key".');
 
-    if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-      throw new Error(
-        '[firebase-admin] FIREBASE_SERVICE_ACCOUNT_JSON parsed successfully but is missing ' +
-        'one or more required fields: project_id, private_key, client_email.'
-      );
-    }
-
-    return initializeApp({
+    _adminApp = initializeApp({
       credential: cert({
-        projectId: serviceAccount.project_id,
-        // Vercel sometimes double-escapes newlines in env vars — fix them
-        privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
-        clientEmail: serviceAccount.client_email,
+        projectId: sa.project_id,
+        clientEmail: sa.client_email,
+        // Vercel sometimes double-escapes newlines — normalize them
+        privateKey: sa.private_key.replace(/\\n/g, '\n'),
       }),
     });
+    return _adminApp;
   }
 
-  // ── Option 2: Three separate env vars ─────────────────────────────────────
+  // ── Option 2: Three separate env vars ────────────────────────────────────
   const projectId = process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (clientEmail && privateKey && projectId) {
-    return initializeApp({
+    if (!privateKey.includes('BEGIN')) {
+      throw new Error(
+        'Server misconfigured: FIREBASE_PRIVATE_KEY appears malformed. ' +
+        'It must contain the full PEM key including "-----BEGIN ... KEY-----" headers. ' +
+        'On Vercel, paste the exact value from the service-account JSON (with literal \\n characters).'
+      );
+    }
+    _adminApp = initializeApp({
       credential: cert({
         projectId,
         clientEmail,
         privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
     });
+    return _adminApp;
   }
 
-  // ── Option 3: Project-ID only (no service account) ────────────────────────
-  // Firebase Admin can still verify ID tokens using its public key endpoint,
-  // but other Admin APIs (user management, custom tokens, etc.) will fail.
+  // ── Option 3: Project-ID only (limited mode) ──────────────────────────────
   if (projectId) {
     console.warn(
-      '[firebase-admin] No service account credentials found. ' +
-      'Initializing in project-ID-only mode — token verification will work ' +
-      'but most other Admin SDK features will not. ' +
-      'Set FIREBASE_SERVICE_ACCOUNT_JSON (or FIREBASE_PROJECT_ID + ' +
-      'FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY) to enable full Admin access.'
+      '[firebase-admin] No service account credentials — running in project-ID-only mode. ' +
+      'Token verification works, but most other Admin SDK features will not.'
     );
-    return initializeApp({ projectId });
+    _adminApp = initializeApp({ projectId });
+    return _adminApp;
   }
 
-  // ── No configuration at all — hard failure ─────────────────────────────────
+  // ── Nothing at all — hard failure with instructions ───────────────────────
+  const envProblems = checkEnvVars();
   throw new Error(
-    '[firebase-admin] Cannot initialize Firebase Admin SDK: no credentials found. ' +
-    'Set one of the following in your environment:\n' +
-    '  • FIREBASE_SERVICE_ACCOUNT_JSON  (full service account key JSON)\n' +
-    '  • FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY\n' +
-    '  • NEXT_PUBLIC_FIREBASE_PROJECT_ID  (project-ID-only / limited mode)'
+    'Server misconfigured: cannot initialize Firebase Admin SDK.\n' +
+    envProblems.join('\n')
   );
 }
 
-const adminApp: App = getAdminApp();
-export const adminAuth: Auth = getAuth(adminApp);
+/**
+ * Get the Firebase Admin Auth instance.
+ * Always call inside a try/catch — throws if credentials are missing/malformed.
+ */
+export function getAdminAuth(): Auth {
+  return getAuth(getAdminApp());
+}

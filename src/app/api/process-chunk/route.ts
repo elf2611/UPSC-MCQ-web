@@ -8,6 +8,8 @@ import crypto from 'crypto';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
+// Supabase admin client — created once per module load (service role key is
+// always available in the server environment; if missing, we want an early error).
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -16,7 +18,7 @@ const supabaseAdmin = createClient(
 const requestSchema = z.object({
   jobId: z.string().min(1, 'Job ID is required'),
   userId: z.string().min(1, 'User ID is required'),
-  config: z.any().optional(), 
+  config: z.any().optional(),
 });
 
 const questionValidationSchema = z.object({
@@ -320,9 +322,13 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: unknown) {
-    console.error('Process chunk error:', error);
+    // Guaranteed JSON fallback — never return an HTML error page
+    console.error('[process-chunk] Unhandled error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        detail: process.env.NODE_ENV === 'development' ? String(error) : undefined,
+      },
       { status: 500 }
     );
   }

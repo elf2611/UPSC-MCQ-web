@@ -10,11 +10,6 @@ import { verifyAdminToken } from '@/lib/auth-verify';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const requestSchema = z.object({
   storagePath: z.string().min(1, 'Storage path is required'),
 });
@@ -44,12 +39,17 @@ export async function POST(request: NextRequest) {
     const { uid } = authResult;
 
     // 2. Validate body
-    const body = await request.json();
-    const parsed = requestSchema.safeParse(body);
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Request body is not valid JSON.' }, { status: 400 });
+    }
 
+    const parsed = requestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid request', details: parsed.error.format() },
+        { error: 'Invalid request body', details: parsed.error.format() },
         { status: 400 }
       );
     }
@@ -62,6 +62,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many upload registrations. Please wait.' }, { status: 429 });
     }
 
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // 4. Download the file from Supabase Storage
     const { data: fileData, error: downloadError } = await supabaseAdmin
       .storage
@@ -69,7 +74,7 @@ export async function POST(request: NextRequest) {
       .download(storagePath);
 
     if (downloadError || !fileData) {
-      console.error('Download error:', downloadError);
+      console.error('[register-upload] Download error:', downloadError);
       return NextResponse.json(
         { error: 'Failed to download the uploaded file from storage. It may have been deleted or corrupted.' },
         { status: 500 }
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await fileData.arrayBuffer();
 
-    // 5. Empty check
+    // 5. Empty file check
     if (arrayBuffer.byteLength === 0) {
       await supabaseAdmin.storage.from('pdf_uploads').remove([storagePath]);
       return NextResponse.json(
@@ -87,7 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Load PDF using pdf-lib to get page count
+    // 6. Load PDF to get page count
     let pdfDoc;
     try {
       pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
@@ -99,21 +104,17 @@ export async function POST(request: NextRequest) {
           error: 'This PDF is password-protected or encrypted. Please unlock it and try again.'
         }, { status: 422 });
       }
-      return NextResponse.json({
-        error: 'The PDF is corrupted or invalid.'
-      }, { status: 422 });
+      return NextResponse.json({ error: 'The PDF is corrupted or invalid.' }, { status: 422 });
     }
 
     const totalPages = pdfDoc.getPageCount();
 
     if (totalPages === 0) {
       await supabaseAdmin.storage.from('pdf_uploads').remove([storagePath]);
-      return NextResponse.json({
-        error: 'The PDF has 0 pages.'
-      }, { status: 422 });
+      return NextResponse.json({ error: 'The PDF has 0 pages.' }, { status: 422 });
     }
 
-    // 7. Calculate chunks and insert jobs
+    // 7. Create chunk jobs
     const uploadId = crypto.randomUUID();
     const jobsToInsert = [];
 
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
       .insert(jobsToInsert);
 
     if (insertError) {
-      console.error('Failed to insert processing jobs:', insertError);
+      console.error('[register-upload] Failed to insert processing jobs:', insertError);
       await supabaseAdmin.storage.from('pdf_uploads').remove([storagePath]);
       return NextResponse.json(
         { error: 'Database error while creating processing jobs.' },
@@ -148,6 +149,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (err: unknown) {
+    // Guaranteed JSON fallback — never return an HTML error page
+    console.error('[register-upload] Unhandled error:', err);
     const errorResponse = handleApiError('/api/register-upload', err);
     return NextResponse.json(errorResponse, { status: 500 });
   }
