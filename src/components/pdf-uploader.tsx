@@ -168,14 +168,22 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     };
   }, [uploadId, status, user, fetchJobs]);
 
+  const activeRequestsRef = useRef<Set<string>>(new Set());
+
   // ORCHESTRATOR: Concurrently process up to 2 chunks
   useEffect(() => {
     if (status !== "processing_chunks" || !uploadId || !user) return;
     if (jobs.length === 0) return;
 
     const completedJobs = jobs.filter(j => j.status === 'completed');
-    const activeProcessing = jobs.filter(j => j.status === 'processing').length;
-    const waitingJobs = jobs.filter(j => j.status === 'waiting' || (j.status === 'failed' && (j.retry_count || 0) < 3));
+    
+    // We consider a job "active" if the server says it is processing OR if we just sent a request for it.
+    const activeProcessingJobs = jobs.filter(j => j.status === 'processing' || activeRequestsRef.current.has(j.id));
+    
+    const waitingJobs = jobs.filter(j => 
+      (j.status === 'waiting' || (j.status === 'failed' && (j.retry_count || 0) < 3)) && 
+      !activeRequestsRef.current.has(j.id)
+    );
 
     if (completedJobs.length === jobs.length && jobs.length > 0) {
       setStatus("success");
@@ -184,24 +192,48 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
       return;
     }
 
-    if (activeProcessing < 2 && waitingJobs.length > 0) {
+    if (activeProcessingJobs.length < 2 && waitingJobs.length > 0) {
       const jobToProcess = waitingJobs[0];
 
-      setJobs(prev => prev.map(j => j.id === jobToProcess.id ? { ...j, status: 'processing', status_message: 'Starting job...' } : j));
+      // Mark as actively requested so we don't fire multiple fetches for the same job
+      activeRequestsRef.current.add(jobToProcess.id);
+      
+      console.log(`[Orchestrator] Attempting to start job ${jobToProcess.id} (Pages ${jobToProcess.chunk_start_page}-${jobToProcess.chunk_end_page})`);
 
-      getFreshIdToken().then(token => {
-        fetch("/api/process-chunk", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}` 
-          },
-          body: JSON.stringify({
-            jobId: jobToProcess.id,
-            config: aiConfig
-          })
-        }).then(() => fetchJobs(uploadId)).catch(() => fetchJobs(uploadId));
-      });
+      getFreshIdToken()
+        .then(async (token) => {
+          console.log(`[Orchestrator] Calling POST /api/process-chunk for job ${jobToProcess.id}`);
+          
+          try {
+            const res = await fetch("/api/process-chunk", {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}` 
+              },
+              body: JSON.stringify({
+                jobId: jobToProcess.id,
+                config: aiConfig
+              })
+            });
+
+            console.log(`[Orchestrator] Job ${jobToProcess.id} fetch completed with status: ${res.status}`);
+            
+            if (!res.ok) {
+              const errData = await res.text();
+              console.error(`[Orchestrator] Server error for job ${jobToProcess.id}:`, errData);
+            }
+          } catch (fetchErr) {
+            console.error(`[Orchestrator] Network/Client error calling process-chunk for job ${jobToProcess.id}:`, fetchErr);
+          } finally {
+            activeRequestsRef.current.delete(jobToProcess.id);
+            fetchJobs(uploadId);
+          }
+        })
+        .catch(err => {
+          console.error(`[Orchestrator] Failed to get auth token for job ${jobToProcess.id}:`, err);
+          activeRequestsRef.current.delete(jobToProcess.id);
+        });
     }
   }, [jobs, status, uploadId, user, aiConfig, onExtractionComplete, fetchJobs]);
 
@@ -215,6 +247,7 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     setStatus("uploading");
     setProgress(0);
     setErrorMsg("");
+    activeRequestsRef.current.clear();
 
     try {
       let idToken: string;
