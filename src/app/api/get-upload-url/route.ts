@@ -81,13 +81,29 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // 6. Check if bucket exists first
+    const bucketName = 'pdf_uploads';
+    const { data: bucketData, error: bucketError } = await supabaseAdmin.storage.getBucket(bucketName);
+
+    if (bucketError || !bucketData) {
+      console.error(`[get-upload-url] Bucket check failed for '${bucketName}':`, bucketError);
+      return NextResponse.json(
+        { 
+          error: `Storage bucket '${bucketName}' does not exist or is inaccessible. Please create it in the Supabase dashboard under Storage.`,
+          detail: bucketError?.message
+        }, 
+        { status: 500 }
+      );
+    }
+
+    // 7. Generate signed upload URL
     const fileExt = fileName.split('.').pop() || 'pdf';
     const uniqueFileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
     const storagePath = `uploads/${uniqueFileName}`;
 
     const { data: uploadData, error: uploadError } = await supabaseAdmin
       .storage
-      .from('pdf_uploads')
+      .from(bucketName)
       .createSignedUploadUrl(storagePath, { upsert: false });
 
     if (uploadError || !uploadData) {
