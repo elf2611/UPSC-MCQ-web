@@ -168,74 +168,75 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     };
   }, [uploadId, status, user, fetchJobs]);
 
-  const activeRequestsRef = useRef<Set<string>>(new Set());
+  const isProcessingRef = useRef(false);
 
-  // ORCHESTRATOR: Concurrently process up to 2 chunks
+  // Check for completion
   useEffect(() => {
-    if (status !== "processing_chunks" || !uploadId || !user) return;
-    if (jobs.length === 0) return;
-
-    const completedJobs = jobs.filter(j => j.status === 'completed');
-    
-    // We consider a job "active" if the server says it is processing OR if we just sent a request for it.
-    const activeProcessingJobs = jobs.filter(j => j.status === 'processing' || activeRequestsRef.current.has(j.id));
-    
-    const waitingJobs = jobs.filter(j => 
-      (j.status === 'waiting' || (j.status === 'failed' && (j.retry_count || 0) < 3)) && 
-      !activeRequestsRef.current.has(j.id)
-    );
-
-    if (completedJobs.length === jobs.length && jobs.length > 0) {
-      setStatus("success");
-      const totalQuestions = jobs.reduce((sum, j) => sum + (j.questions_generated || 0), 0);
-      onExtractionComplete(totalQuestions);
-      return;
+    if (jobs.length > 0 && status === "processing_chunks") {
+      const completedJobs = jobs.filter(j => j.status === 'completed');
+      if (completedJobs.length === jobs.length) {
+        setStatus("success");
+        const totalQuestions = jobs.reduce((sum, j) => sum + (j.questions_generated || 0), 0);
+        onExtractionComplete(totalQuestions);
+      }
     }
+  }, [jobs, status, onExtractionComplete]);
 
-    if (activeProcessingJobs.length < 2 && waitingJobs.length > 0) {
-      const jobToProcess = waitingJobs[0];
+  const startProcessingLoop = useCallback(async () => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
 
-      // Mark as actively requested so we don't fire multiple fetches for the same job
-      activeRequestsRef.current.add(jobToProcess.id);
-      
-      console.log(`[Orchestrator] Attempting to start job ${jobToProcess.id} (Pages ${jobToProcess.chunk_start_page}-${jobToProcess.chunk_end_page})`);
-
-      getFreshIdToken()
-        .then(async (token) => {
-          console.log(`[Orchestrator] Calling POST /api/process-chunk for job ${jobToProcess.id}`);
-          
-          try {
-            const res = await fetch("/api/process-chunk", {
-              method: "POST",
-              headers: { 
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}` 
-              },
-              body: JSON.stringify({
-                jobId: jobToProcess.id,
-                config: aiConfig
-              })
-            });
-
-            console.log(`[Orchestrator] Job ${jobToProcess.id} fetch completed with status: ${res.status}`);
-            
-            if (!res.ok) {
-              const errData = await res.text();
-              console.error(`[Orchestrator] Server error for job ${jobToProcess.id}:`, errData);
-            }
-          } catch (fetchErr) {
-            console.error(`[Orchestrator] Network/Client error calling process-chunk for job ${jobToProcess.id}:`, fetchErr);
-          } finally {
-            activeRequestsRef.current.delete(jobToProcess.id);
-            fetchJobs(uploadId);
-          }
-        })
-        .catch(err => {
-          console.error(`[Orchestrator] Failed to get auth token for job ${jobToProcess.id}:`, err);
-          activeRequestsRef.current.delete(jobToProcess.id);
+    console.log("[Orchestrator] Starting chunk processing loop...");
+    
+    while (isProcessingRef.current) {
+      try {
+        const token = await getFreshIdToken();
+        const res = await fetch("/api/process-next", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
+          },
+          body: JSON.stringify({ config: aiConfig })
         });
+
+        if (res.status === 200) {
+          const data = await res.json();
+          if (data.message === 'No waiting jobs found.') {
+            console.log("[Orchestrator] No more waiting jobs. Stopping loop.");
+            isProcessingRef.current = false;
+            break;
+          }
+          console.log("[Orchestrator] Chunk processed successfully. Moving to next immediately.");
+          if (uploadId) fetchJobs(uploadId);
+          continue; 
+        }
+        
+        if (res.status === 202) {
+          console.log("[Orchestrator] Job claimed by another worker. Retrying in 1s...");
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+
+        const errText = await res.text();
+        console.error(`[Orchestrator] Server error calling process-next (Status ${res.status}):`, errText);
+        await new Promise(r => setTimeout(r, 5000));
+        
+      } catch (err) {
+        console.error("[Orchestrator] Network/Client error in processing loop:", err);
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
-  }, [jobs, status, uploadId, user, aiConfig, onExtractionComplete, fetchJobs]);
+  }, [aiConfig, uploadId, fetchJobs]);
+
+  // Auto-resume on mount / state change
+  useEffect(() => {
+    if (isProcessingRef.current || !user) return;
+    const hasWaitingJobs = jobs.some(j => j.status === 'waiting');
+    if (hasWaitingJobs || status === "processing_chunks") {
+      startProcessingLoop();
+    }
+  }, [jobs, status, user, startProcessingLoop]);
 
   const handleUpload = async () => {
     if (!file || !user) {
@@ -247,7 +248,6 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
     setStatus("uploading");
     setProgress(0);
     setErrorMsg("");
-    activeRequestsRef.current.clear();
 
     try {
       let idToken: string;
