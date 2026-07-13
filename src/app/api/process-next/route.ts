@@ -42,14 +42,29 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Optional uploadId passed from client
+    let uploadId = undefined;
+    try {
+      const body = await request.json();
+      uploadId = body.uploadId;
+    } catch {
+      // Body is optional
+    }
+
     // 2. Find ONE candidate waiting job (oldest first).
     // This SELECT does not claim anything by itself — it's just a candidate.
-    const { data: candidates, error: findError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('processing_jobs')
       .select('id, upload_id, source_file, chunk_start_page, chunk_end_page, status')
-      .eq('status', 'waiting')
-      .order('created_at', { ascending: true })
-      .limit(1);
+      .eq('status', 'waiting');
+
+    if (uploadId) {
+      query = query.eq('upload_id', uploadId);
+    }
+    
+    query = query.order('created_at', { ascending: true }).limit(1);
+
+    const { data: candidates, error: findError } = await query;
 
     if (findError) {
       log('find_query_failed', { error: findError.message, details: findError.details, hint: findError.hint });

@@ -197,7 +197,7 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}` 
           },
-          body: JSON.stringify({ config: aiConfig })
+          body: JSON.stringify({ config: aiConfig, uploadId })
         });
 
         if (res.status === 200) {
