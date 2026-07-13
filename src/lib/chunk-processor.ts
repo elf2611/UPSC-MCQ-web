@@ -14,6 +14,21 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+// Polyfill Canvas API objects required by pdfjs-dist (used by pdf-parse) in Node.js
+if (typeof global !== 'undefined') {
+  const g = global as Record<string, unknown>;
+  if (typeof g.DOMMatrix === 'undefined') {
+    g.DOMMatrix = class DOMMatrix {};
+  }
+  if (typeof g.Path2D === 'undefined') {
+    g.Path2D = class Path2D {};
+  }
+  if (typeof g.ImageData === 'undefined') {
+    g.ImageData = class ImageData {};
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse');
 
