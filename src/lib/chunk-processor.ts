@@ -6,8 +6,11 @@
 // existing questions, batch-inserts into staged_questions, and marks the
 // job completed. Throws on unrecoverable failure — the caller (process-next)
 // is responsible for marking the job 'failed' if this throws.
+//
+// NOTE: pdf-lib is intentionally NOT used here. It causes DOMMatrix /
+// @napi-rs/canvas errors on Vercel's serverless Node.js runtime.
+// Text extraction uses pdf-parse directly with a pagerender filter.
 
-import { PDFDocument } from 'pdf-lib';
 import crypto from 'crypto';
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -46,6 +49,18 @@ type ChunkProcessorArgs = {
   onStatus: (msg: string) => void;
 };
 
+// Types for pdf-parse's pagerender callback
+interface PdfTextItem {
+  str: string;
+}
+interface PdfTextContent {
+  items: PdfTextItem[];
+}
+interface PdfPageData {
+  pageIndex: number; // 0-based
+  getTextContent: () => Promise<PdfTextContent>;
+}
+
 function normalizeHash(text: string): string {
   const normalized = text.toLowerCase().trim().replace(/\s+/g, ' ');
   return crypto.createHash('sha256').update(normalized).digest('hex');
@@ -69,6 +84,38 @@ function sanitizeJsonResponse(raw: string): string {
   // Normalize smart quotes
   text = text.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
   return text;
+}
+
+// Extract text for only the specified page range from a PDF buffer.
+// Uses pdf-parse's pagerender callback (same library as /api/extract/route.ts)
+// with a max page limit to avoid scanning the entire PDF unnecessarily.
+async function extractTextFromPageRange(
+  buffer: Buffer,
+  startPage: number,
+  endPage: number
+): Promise<string> {
+  const pageTexts: string[] = [];
+
+  await pdfParse(buffer, {
+    // Stop parsing after endPage — no need to scan further pages
+    max: endPage,
+    pagerender: (pageData: PdfPageData): Promise<string> => {
+      const pageNum = pageData.pageIndex + 1; // convert 0-based to 1-based
+      if (pageNum < startPage) {
+        // Before our range — return empty string, don't collect
+        return Promise.resolve('');
+      }
+      return pageData.getTextContent().then((content: PdfTextContent) => {
+        const text = content.items.map((item: PdfTextItem) => item.str).join(' ');
+        if (text.trim().length > 0) {
+          pageTexts.push(text);
+        }
+        return text;
+      });
+    },
+  });
+
+  return pageTexts.join('\n\n');
 }
 
 async function callGeminiWithRetry(prompt: string, onStatus: (msg: string) => void): Promise<string> {
@@ -154,19 +201,12 @@ export async function processChunk(args: ChunkProcessorArgs): Promise<{ question
 
   const arrayBuffer = await fileData.arrayBuffer();
 
-  // 2. Extract just this chunk's page range as text.
+  // 2. Extract text for only this chunk's page range.
+  // Uses pdf-parse directly — no pdf-lib, which fails on Vercel (DOMMatrix).
   await updateStatus(`Extracting pages ${startPage}-${endPage}...`);
-  const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-  const subDoc = await PDFDocument.create();
-  const pageIndices = [];
-  for (let p = startPage; p <= Math.min(endPage, pdfDoc.getPageCount()); p++) {
-    pageIndices.push(p - 1); // pdf-lib is 0-indexed
-  }
-  const copiedPages = await subDoc.copyPages(pdfDoc, pageIndices);
-  copiedPages.forEach((page) => subDoc.addPage(page));
-  const chunkPdfBytes = await subDoc.save();
+  const buffer = Buffer.from(arrayBuffer);
+  const extractedText = await extractTextFromPageRange(buffer, startPage, endPage);
 
-  const extractedText = await extractTextFromPdfBytes(chunkPdfBytes);
   if (!extractedText || extractedText.trim().length === 0) {
     throw new Error(`No extractable text found in pages ${startPage}-${endPage} (possibly a scanned/image PDF)`);
   }
@@ -259,13 +299,4 @@ ${extractedText}`;
     .eq('id', jobId);
 
   return { questionsGenerated: rowsToInsert.length };
-}
-
-// Uses the same pdf-parse library and pattern as /api/extract/route.ts.
-// chunkPdfBytes is a Uint8Array (output of pdf-lib's subDoc.save()).
-// Buffer.from() accepts Uint8Array directly, so no copy is needed.
-async function extractTextFromPdfBytes(bytes: Uint8Array): Promise<string> {
-  const buffer = Buffer.from(bytes);
-  const data = await pdfParse(buffer);
-  return data.text as string;
 }
