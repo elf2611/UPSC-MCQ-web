@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { PDFDocument } from 'pdf-lib';
 import { generateQuestions } from '@/lib/ai/provider';
+import { GenerateRequestConfig } from '@/lib/ai/types';
 import crypto from 'crypto';
 
 const questionValidationSchema = z.object({
@@ -25,7 +26,7 @@ export async function processChunk(
   supabaseAdmin: SupabaseClient,
   jobId: string,
   userId: string,
-  config?: Record<string, unknown>
+  config?: Partial<GenerateRequestConfig>
 ) {
   // 1. Fetch the job details
   const { data: job, error: jobError } = await supabaseAdmin
@@ -91,12 +92,18 @@ export async function processChunk(
 
     // 4. Send to Gemini
     await updateJobStatus(supabaseAdmin, jobId, 'Generating Questions (AI)...');
-    const aiConfig = config || {
-      count: 10,
-      difficulty: 'medium',
-      subject: 'Auto',
-      topic: 'Auto',
-      autoGenerateTags: true,
+    
+    const aiConfig: GenerateRequestConfig = {
+      count: config?.count ?? 10,
+      difficulty: config?.difficulty ?? "Medium",
+      upscLevel: config?.upscLevel ?? "Mixed",
+      subject: config?.subject ?? "Auto",
+      topic: config?.topic ?? "Auto",
+      language: config?.language ?? "English",
+      explanationLength: config?.explanationLength ?? "Medium",
+      includeEliminationTips: config?.includeEliminationTips ?? true,
+      autoGenerateTags: config?.autoGenerateTags ?? true,
+      source: config?.source ?? "PDF Upload"
     };
 
     let generatedQuestions;
