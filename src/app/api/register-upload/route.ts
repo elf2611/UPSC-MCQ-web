@@ -133,10 +133,13 @@ export async function POST(request: NextRequest) {
       .insert(jobsToInsert);
 
     if (insertError) {
-      console.error('[register-upload] Failed to insert processing jobs:', insertError);
+      console.error('[register-upload] Failed to insert processing jobs:', JSON.stringify(insertError, null, 2));
       await supabaseAdmin.storage.from('pdf_uploads').remove([storagePath]);
       return NextResponse.json(
-        { error: 'Database error while creating processing jobs.' },
+        { 
+          error: 'Database error while creating processing jobs.',
+          detail: process.env.NODE_ENV === 'development' ? insertError : undefined
+        },
         { status: 500 }
       );
     }
