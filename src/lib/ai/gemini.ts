@@ -46,7 +46,8 @@ export async function callGemini(payload: GenerateRequestPayload): Promise<Gener
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured on the server.");
 
   const prompt = buildPrompt(payload.text, payload.config);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   let retries = 0;
   const maxRetries = 3;
