@@ -7,25 +7,18 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+import { verifyAdminToken } from '@/lib/auth-verify';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role, email')
-      .eq('id', userId)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const authResult = await verifyAdminToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        { error: authResult.error, detail: authResult.detail },
+        { status: authResult.status }
+      );
     }
 
     // Run aggregate queries concurrently for speed

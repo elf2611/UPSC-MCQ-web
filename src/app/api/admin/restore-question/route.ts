@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { handleApiError, logger } from '@/lib/logger';
+import { verifyAdminToken } from '@/lib/auth-verify';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,20 +10,19 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, historyId } = await request.json();
-
-    if (!userId || !historyId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    const authResult = await verifyAdminToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        { error: authResult.error, detail: authResult.detail },
+        { status: authResult.status }
+      );
     }
+    const userId = authResult.uid;
 
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role, email')
-      .eq('id', userId)
-      .single();
+    const { historyId } = await request.json();
 
-    if (!profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!historyId) {
+      return NextResponse.json({ error: 'Missing historyId' }, { status: 400 });
     }
 
     // 1. Fetch history record

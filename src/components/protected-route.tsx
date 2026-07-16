@@ -5,23 +5,21 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 export function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         router.push(`/login?redirect=${pathname}`);
-      } else if (adminOnly) {
-        // Hardcoded admin emails check
-        const adminEmails = ["admin@prepwise.com"];
-        if (!user.email || !adminEmails.includes(user.email)) {
-          router.push("/");
-        }
+      } else if (adminOnly && !isAdmin) {
+        router.push("/");
       }
     }
-  }, [user, loading, router, pathname, adminOnly]);
+  }, [user, loading, router, pathname, adminOnly, isAdmin]);
 
   if (loading) {
     return (
@@ -31,7 +29,7 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
     );
   }
 
-  if (!user || (adminOnly && (!user.email || !["admin@prepwise.com"].includes(user.email)))) {
+  if (!user || (adminOnly && !isAdmin)) {
     return null;
   }
 

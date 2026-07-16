@@ -11,10 +11,10 @@ import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { logger } from './logger';
 
-const ADMIN_EMAIL = 'admin@prepwise.com';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 
 // Service-role Supabase client — bypasses RLS for the profile read
-function getSupabaseAdmin() {
+export function getSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -26,18 +26,18 @@ export type AdminVerifyResult =
   | { ok: false; status: 401 | 403 | 500; error: string; detail: string };
 
 /**
- * Verify the request's Firebase ID token and confirm the user is an admin.
+ * Verify the request's Firebase ID token for ANY user.
  * Never throws — always returns a result object safe to return as JSON.
  */
-export async function verifyAdminToken(request: NextRequest): Promise<AdminVerifyResult> {
+export async function verifyUserToken(request: NextRequest): Promise<AdminVerifyResult> {
   const route = request.nextUrl.pathname;
 
   // ── Step 1: Check Authorization header ──────────────────────────────────
   const authHeader = request.headers.get('authorization');
-  logger.info({ event_type: 'admin_verify_start', route, has_auth_header: !!authHeader });
+  logger.info({ event_type: 'verify_start', route, has_auth_header: !!authHeader });
 
   if (!authHeader?.startsWith('Bearer ')) {
-    logger.warn({ event_type: 'admin_verify_fail', route, reason: 'missing_token' });
+    logger.warn({ event_type: 'verify_fail', route, reason: 'missing_token' });
     return {
       ok: false,
       status: 401,
@@ -52,7 +52,7 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
   // Uses NEXT_PUBLIC_FIREBASE_API_KEY — already set in Vercel, no service account needed.
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   if (!apiKey) {
-    logger.error({ event_type: 'admin_verify_fail', route, reason: 'missing_api_key' });
+    logger.error({ event_type: 'verify_fail', route, reason: 'missing_api_key' });
     return {
       ok: false,
       status: 500,
@@ -60,9 +60,6 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
       detail: 'NEXT_PUBLIC_FIREBASE_API_KEY env var is not set.',
     };
   }
-
-  let uid: string;
-  let tokenEmail: string | undefined;
 
   try {
     const firebaseRes = await fetch(
@@ -79,7 +76,7 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
       const errCode = (errBody as { error?: { message?: string } })?.error?.message ?? `HTTP ${firebaseRes.status}`;
 
       const isExpired = errCode.includes('EXPIRED') || errCode.includes('TOKEN_EXPIRED');
-      logger.warn({ event_type: 'admin_verify_fail', route, reason: isExpired ? 'token_expired' : 'token_invalid', detail: errCode });
+      logger.warn({ event_type: 'verify_fail', route, reason: isExpired ? 'token_expired' : 'token_invalid', detail: errCode });
 
       return {
         ok: false,
@@ -95,7 +92,7 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
     const fbUser = body.users?.[0];
 
     if (!fbUser?.localId) {
-      logger.warn({ event_type: 'admin_verify_fail', route, reason: 'no_user_in_response' });
+      logger.warn({ event_type: 'verify_fail', route, reason: 'no_user_in_response' });
       return {
         ok: false,
         status: 401,
@@ -104,13 +101,14 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
       };
     }
 
-    uid = fbUser.localId;
-    tokenEmail = fbUser.email;
+    const uid = fbUser.localId;
+    const tokenEmail = fbUser.email || '';
 
-    logger.info({ event_type: 'admin_verify_token_ok', route, uid, email: tokenEmail });
+    logger.info({ event_type: 'verify_token_ok', route, uid, email: tokenEmail });
+    return { ok: true, uid, email: tokenEmail };
   } catch (err: unknown) {
     const detail = err instanceof Error ? err.message : String(err);
-    logger.error({ event_type: 'admin_verify_fail', route, reason: 'network_error', detail });
+    logger.error({ event_type: 'verify_fail', route, reason: 'network_error', detail });
     return {
       ok: false,
       status: 500,
@@ -118,9 +116,24 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
       detail,
     };
   }
+}
+
+/**
+ * Verify the request's Firebase ID token and confirm the user is an admin.
+ * Never throws — always returns a result object safe to return as JSON.
+ */
+export async function verifyAdminToken(request: NextRequest): Promise<AdminVerifyResult> {
+  const route = request.nextUrl.pathname;
+  
+  const tokenResult = await verifyUserToken(request);
+  if (!tokenResult.ok) {
+    return tokenResult;
+  }
+  
+  const { uid, email: tokenEmail } = tokenResult;
 
   // ── Step 3: Email fast-path ──────────────────────────────────────────────
-  if (tokenEmail === ADMIN_EMAIL) {
+  if (tokenEmail === ADMIN_EMAIL && ADMIN_EMAIL !== '') {
     logger.info({ event_type: 'admin_verify_ok', route, uid, method: 'email_fastpath' });
     return { ok: true, uid, email: tokenEmail };
   }
@@ -166,7 +179,7 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
     return { ok: false, status: 403, error: 'Account not found in database.', detail: `uid=${uid}` };
   }
 
-  const isAdmin = profile.role === 'admin' || profile.email === ADMIN_EMAIL;
+  const isAdmin = profile.role === 'admin' || (profile.email === ADMIN_EMAIL && ADMIN_EMAIL !== '');
   if (!isAdmin) {
     logger.warn({
       event_type: 'admin_verify_fail', route, uid, reason: 'not_admin',

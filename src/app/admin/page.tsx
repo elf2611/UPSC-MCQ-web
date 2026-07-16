@@ -158,9 +158,13 @@ export default function AdminPage() {
     if (!aiExtractedContext.trim()) return alert("No context to generate from.");
     setAiGenerating(true);
     try {
+      const token = await user?.getIdToken();
       const res = await fetch("/api/generate-questions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ text: aiExtractedContext, config: aiConfig })
       });
       const data = await res.json();
@@ -183,12 +187,15 @@ export default function AdminPage() {
       console.log('[handleBulkSave] Sending questions to API:', 
         JSON.stringify(aiGeneratedQuestions, null, 2))
 
+      const token = await user?.getIdToken();
       const response = await fetch('/api/admin/save-questions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           questions: aiGeneratedQuestions,
-          userId: null, // service role handles auth bypass
         }),
       })
 

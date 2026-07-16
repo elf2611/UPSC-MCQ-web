@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { handleApiError } from '@/lib/logger';
+import { verifyAdminToken } from '@/lib/auth-verify';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,26 +14,19 @@ const supabaseAdmin = createClient(
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        { error: authResult.error, detail: authResult.detail },
+        { status: authResult.status }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const format = searchParams.get('format') || 'csv'; // csv, json, xlsx
     const subject = searchParams.get('subject');
     const topic = searchParams.get('topic');
     const difficulty = searchParams.get('difficulty');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role, email')
-      .eq('id', userId)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     let query = supabaseAdmin.from('questions').select('*');
 

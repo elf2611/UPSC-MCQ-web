@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { handleApiError } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 
+import { verifyAdminToken } from '@/lib/auth-verify';
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -23,7 +25,6 @@ const questionSchema = z.object({
 
 const payloadSchema = z.object({
   questions: z.array(z.any()),
-  userId: z.string().min(1, 'User ID is required'),
 });
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -36,6 +37,15 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await verifyAdminToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        { error: authResult.error, detail: authResult.detail },
+        { status: authResult.status }
+      );
+    }
+    const userId = authResult.uid;
+
     // 1. Enforce payload size
     const contentLength = Number(request.headers.get('content-length') || 0);
     if (contentLength > MAX_PAYLOAD_SIZE) {
@@ -49,18 +59,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid payload', details: parsed.error.format() }, { status: 400 });
     }
-    const { questions, userId } = parsed.data;
-
-    // 3. Admin Verification & Rate Limit
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role, email')
-      .eq('id', userId)
-      .single();
-
-    if (profileError || !profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 });
-    }
+    const { questions } = parsed.data;
 
     const rateLimit = await checkRateLimit(`save_questions_${userId}`);
     if (!rateLimit.success) {

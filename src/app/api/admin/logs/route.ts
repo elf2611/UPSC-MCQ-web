@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { handleApiError } from '@/lib/logger';
+import { verifyAdminToken } from '@/lib/auth-verify';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,25 +12,18 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await verifyAdminToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        { error: authResult.error, detail: authResult.detail },
+        { status: authResult.status }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const page = parseInt(searchParams.get('page') || '0', 10);
     const type = searchParams.get('type') || '';
     const dateFrom = searchParams.get('dateFrom') || '';
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('role, email')
-      .eq('id', userId)
-      .single();
-
-    if (!profile || (profile.role !== 'admin' && profile.email !== 'admin@prepwise.com')) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
 
     let query = supabaseAdmin.from('system_logs').select('*', { count: 'exact' });
 

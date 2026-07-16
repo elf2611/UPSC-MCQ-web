@@ -23,7 +23,7 @@ export function Navbar() {
     { name: "Daily Current Affairs", href: "/current-affairs" },
   ];
 
-  if (user?.email === "admin@prepwise.com") {
+  if (profile?.role === 'admin') {
     navLinks.push({ name: "Admin Panel", href: "/admin" });
   }
 

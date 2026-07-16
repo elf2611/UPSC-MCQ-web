@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { handleApiError } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { verifyUserToken } from '@/lib/auth-verify';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,6 +31,15 @@ const submitSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // 0. Verify Auth Token
+    const authResult = await verifyUserToken(request);
+    if (!authResult.ok) {
+      return NextResponse.json(
+        { error: authResult.error, detail: authResult.detail },
+        { status: authResult.status }
+      );
+    }
+
     // 1. Payload Size Check
     const contentLength = Number(request.headers.get('content-length') || 0);
     if (contentLength > MAX_PAYLOAD_SIZE) {
@@ -48,6 +58,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { userId, testId, mode, startedAt, timeTakenSeconds, answerRows } = parsed.data;
+
+    if (userId !== authResult.uid) {
+      return NextResponse.json({ error: 'Unauthorized user mismatch' }, { status: 403 });
+    }
 
     // 3. Rate Limiting
     const rateLimit = await checkRateLimit(`submit_${userId}`);

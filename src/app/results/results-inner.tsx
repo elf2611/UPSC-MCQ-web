@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ResponsiveContainer, Tooltip,
@@ -129,94 +128,30 @@ export default function ResultsInner() {
       }
       
       try {
-        const { data: attemptData, error: attemptError } = await supabase
-          .from("test_attempts")
-          .select("*")
-          .eq("id", attemptId)
-          .eq("user_id", user.uid)
-          .single();
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/get-result?attempt_id=${attemptId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
 
-        if (attemptError || !attemptData) {
-          console.error('Attempt fetch error:', attemptError);
-          setErrorMsg(attemptError?.message || 'Results not found. The test may not have saved correctly.');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error('Fetch error:', res.status, errData);
+          setErrorMsg(errData.error || 'Results not found. The test may not have saved correctly.');
           setLoading(false);
           return;
         }
 
+        const data = await res.json();
+        
         console.log('=== RESULTS DEBUG ===')
         console.log('attempt_id from URL:', attemptId)
         console.log('current user uid:', user?.uid)
-        console.log('attempt data:', JSON.stringify(attemptData, null, 2))
-        console.log('attempt error:', attemptError)
+        
+        setAttempt(data.attempt);
+        setAnswers(data.answers || []);
 
-        setAttempt(attemptData);
-
-        const { data: answersData, error: answersError } = await supabase
-          .from("attempt_answers")
-          .select(`
-            id,
-            question_id,
-            selected_option,
-            is_correct,
-            marked_for_review,
-            questions (
-              id,
-              question_text,
-              option_a,
-              option_b,
-              option_c,
-              option_d,
-              correct_option,
-              explanation,
-              why_a_wrong,
-              why_b_wrong,
-              why_c_wrong,
-              why_d_wrong,
-              elimination_tip,
-              static_topic_link,
-              subject,
-              topic
-            )
-          `)
-          .eq("attempt_id", attemptId)
-          .order("id");
-
-        console.log('answers count:', answersData?.length)
-        console.log('first answer:', JSON.stringify(answersData?.[0], null, 2))
-        console.log('answers error:', answersError)
-
-        if (answersError) {
-          console.error('Answers fetch error:', answersError);
-        }
-
-        const { count } = await supabase
-          .from('attempt_answers')
-          .select('*', { count: 'exact', head: true })
-          .eq('attempt_id', attemptId)
-
-        console.log('Answer count for this attempt:', count)
-
-        setAnswers((answersData as unknown as AttemptAnswer[]) || []);
-
-        console.log('=== ANSWER REVIEW DEBUG ===')
-        answersData?.forEach((ans, i) => {
-          console.log(`Q${i+1}:`, {
-            question_id: ans.question_id,
-            selected_option: ans.selected_option,
-            is_correct: ans.is_correct,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            correct_option: (ans as any).questions?.correct_option,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            has_question: !!(ans as any).questions,
-          })
-        })
-
-        const correctCount = answersData?.filter(a => a.is_correct === true).length
-        const wrongCount = answersData?.filter(a => a.is_correct === false).length
-        const skippedCount = answersData?.filter(a => !a.selected_option).length
-        console.log('Correct:', correctCount, 
-                    'Wrong:', wrongCount, 
-                    'Skipped:', skippedCount)
       } catch (err) {
         console.error('Results fetch error:', err);
         setErrorMsg('Something went wrong loading results.');

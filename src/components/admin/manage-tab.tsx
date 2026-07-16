@@ -8,8 +8,6 @@ import { supabase } from "@/lib/supabase";
 import { HistoryModal } from "./history-modal";
 import { ImportModal } from "./import-modal";
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
-
 export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => void }) {
   const { user } = useAuth();
   
@@ -20,6 +18,19 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
   const [historyQuestionId, setHistoryQuestionId] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "xlsx" | "json" | null>(null);
+
+  const fetcher = async (url: string) => {
+    const token = await user?.getIdToken();
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      const err = new Error("Failed to fetch data");
+      (err as any).status = res.status;
+      throw err;
+    }
+    return res.json();
+  };
 
   // Debounce search
   useEffect(() => {
@@ -58,7 +69,10 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
       if (debouncedSearch) url.searchParams.set("q", debouncedSearch); // We'd need API support for 'q', let's stick to base filters
       url.searchParams.set("difficulty", difficulty);
       
-      const res = await fetch(url.toString());
+      const token = await user?.getIdToken();
+      const res = await fetch(url.toString(), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
       if (!res.ok) throw new Error(await res.text());
 
       // Trigger download

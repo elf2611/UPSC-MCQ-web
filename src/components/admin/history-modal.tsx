@@ -35,10 +35,14 @@ export function HistoryModal({ questionId, onClose, onRestored }: { questionId: 
     setError("");
     
     try {
+      const token = await user?.getIdToken();
       const res = await fetch('/api/admin/restore-question', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user?.uid, historyId })
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ historyId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

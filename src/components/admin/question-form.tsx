@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Save, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
 export const questionSchema = z.object({
   id: z.string().optional(),
@@ -48,6 +49,7 @@ interface QuestionFormProps {
 }
 
 export function QuestionForm({ initialData, subjects, topics, userId, onSuccess, onCancel }: QuestionFormProps) {
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -75,10 +77,14 @@ export function QuestionForm({ initialData, subjects, topics, userId, onSuccess,
 
       if (initialData?.id) {
         // Edit mode (call secure API to trigger version history)
+        const token = await user?.getIdToken();
         const res = await fetch('/api/admin/edit-question', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, questionId: initialData.id, updates: payload })
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ questionId: initialData.id, updates: payload })
         });
         const result = await res.json();
         if (!res.ok) throw new Error(result.error || "Failed to update question");

@@ -1,23 +1,60 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
 import { Activity, BookOpen, Brain, Clock, Database, Layers } from "lucide-react";
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
-
 export function DashboardTab() {
   const { user } = useAuth();
+  const [failures, setFailures] = useState(0);
+  const [isFocused, setIsFocused] = useState(true);
+
+  useEffect(() => {
+    const onFocus = () => setIsFocused(true);
+    const onBlur = () => setIsFocused(false);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
+
+  const fetcher = async (url: string) => {
+    const token = await user?.getIdToken();
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      const err = new Error("Failed to fetch dashboard");
+      (err as any).status = res.status;
+      throw err;
+    }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  };
   
-  // Poll every 10 seconds for live updates
+  // Poll only if focused and failures < 3
+  const shouldPoll = isFocused && failures < 3;
   const { data, error, isLoading } = useSWR(
     user?.uid ? `/api/admin/dashboard?userId=${user.uid}` : null, 
     fetcher, 
-    { refreshInterval: 10000 }
+    { 
+      refreshInterval: shouldPoll ? 10000 : 0,
+      onError: (err) => {
+        if ((err as any).status === 401 || (err as any).status === 403) {
+          setFailures(prev => prev + 1);
+        }
+      },
+      onSuccess: () => setFailures(0),
+      revalidateOnFocus: false // handled by our own focus listener/refreshInterval
+    }
   );
 
   if (isLoading) return <div className="text-white py-10">Loading Dashboard Stats...</div>;
-  if (error || data?.error) return <div className="text-red-400 py-10">Failed to load dashboard: {error?.message || data?.error}</div>;
+  if (error) return <div className="text-red-400 py-10">Failed to load dashboard: {error.message}</div>;
 
   const stats = data || {};
 

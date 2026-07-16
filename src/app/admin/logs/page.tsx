@@ -6,8 +6,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Download, ChevronLeft, ChevronRight, Activity, Calendar } from "lucide-react";
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
-
 export default function LogsPage() {
   const { user } = useAuth();
   
@@ -15,8 +13,20 @@ export default function LogsPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
 
+  const fetcher = async (url: string) => {
+    const token = await user?.getIdToken();
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      const err = new Error("Failed to fetch logs");
+      (err as any).status = res.status;
+      throw err;
+    }
+    return res.json();
+  };
+
   const queryParams = new URLSearchParams({
-    userId: user?.uid || "",
     page: page.toString(),
     type: typeFilter,
     dateFrom: dateFilter
