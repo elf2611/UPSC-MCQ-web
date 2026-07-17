@@ -20,6 +20,7 @@ interface Question {
   option_c: string;
   option_d: string;
   correct_option: string;
+  year?: number | null;
   explanation?: string;
   subject?: string;
   topic?: string;
@@ -377,6 +378,18 @@ export default function ResultsInner() {
                         {originalIndex + 1}
                       </span>
                       <div className="flex-1">
+                        <div className="flex gap-2 mb-2 flex-wrap">
+                          {ans.questions?.year && (
+                            <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                              UPSC {ans.questions.year}
+                            </span>
+                          )}
+                          {attempt?.mode === 'current-affairs' && (
+                            <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              Current Affairs
+                            </span>
+                          )}
+                        </div>
                         <p className="text-zinc-200 text-base leading-relaxed">{ans.questions?.question_text}</p>
                         {ans.questions?.subject && (
                           <span className="inline-block mt-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">{ans.questions.subject}</span>

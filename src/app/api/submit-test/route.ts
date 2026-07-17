@@ -23,7 +23,7 @@ const answerRowSchema = z.object({
 const submitSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   testId: z.string().uuid().optional(),
-  mode: z.enum(['practice', 'exam']).default('practice'),
+  mode: z.enum(['practice', 'test', 'mock', 'pyq', 'current-affairs', 'custom', 'exam']).default('practice'),
   startedAt: z.string().optional(),
   timeTakenSeconds: z.number().default(0),
   answerRows: z.array(answerRowSchema).default([]),

@@ -33,6 +33,7 @@ Requirements for each question:
 7. Revision priority: choose from "low", "normal", or "high".
 ${includeEliminationTips ? '8. Include a specific UPSC "Elimination Tip" to help logically eliminate wrong options.\n9. Include a "Memory Trick" to help remember the concept.' : '8. Do NOT include elimination tips or memory tricks.'}
 ${autoGenerateTags ? '10. Generate an array of 3-5 relevant tags (strings).' : ''}
+11. For the year field only, use null if it cannot be determined — never an empty string. year: the actual UPSC exam year this question was asked in, if the source text labels it (e.g. '[2019]', 'UPSC CSE 2020', a year in parentheses near the question). Use null if the source doesn't indicate a specific exam year (i.e., not a genuine PYQ).
 
 CRITICAL INSTRUCTION:
 Return ONLY a valid JSON array of objects. Do not include markdown formatting, backticks (\`\`\`), or any conversational text outside the JSON array.
@@ -58,9 +59,11 @@ JSON Schema per object:
   "estimated_solving_time": number,
   "subject": "string",
   "topic": "string",
+  "subtopic": "string",
   "tags": ["string"],
   "source": "string",
-  "revision_priority": "low" | "normal" | "high"
+  "revision_priority": "low" | "normal" | "high",
+  "year": number | null
 }
 
 Source text to base the questions on:

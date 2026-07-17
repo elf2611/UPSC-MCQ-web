@@ -8,47 +8,44 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 
-function PracticeTestModal({ 
+function PYQTestModal({ 
   onClose, 
   onStart, 
   subjectName,
   topics,
-  subtopics
+  subtopics,
+  availableYears
 }: { 
   onClose: () => void; 
-  onStart: (cfg: { mode: string, count: number, difficulty: string, topic?: string, subtopic?: string }) => void; 
+  onStart: (cfg: { mode: string, count: number, difficulty: string, topic?: string, subtopic?: string, year?: string }) => void; 
   subjectName: string;
   topics: Record<string, unknown>[];
   subtopics: Record<string, unknown>[];
+  availableYears: number[];
 }) {
-  const [mode, setMode] = useState<"practice" | "test">("practice");
+  const [mode, setMode] = useState<"pyq">("pyq");
   const [count, setCount] = useState(20);
   const [difficulty, setDifficulty] = useState("Medium");
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">Start {subjectName} Practice</h2>
+          <h2 className="text-xl font-bold text-white">Start {subjectName} PYQs</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Mode</h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <button
-              onClick={() => setMode("practice")}
-              className={`py-2 rounded-lg text-sm font-bold border transition-colors ${mode === "practice" ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/30'}`}
+              onClick={() => setMode("pyq")}
+              className={`py-2 rounded-lg text-sm font-bold border transition-colors bg-primary text-primary-foreground border-primary`}
             >
-              Practice (Feedback)
-            </button>
-            <button
-              onClick={() => setMode("test")}
-              className={`py-2 rounded-lg text-sm font-bold border transition-colors ${mode === "test" ? 'bg-primary text-primary-foreground border-primary' : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/30'}`}
-            >
-              Test (No Feedback)
+              Previous Year Questions (PYQs)
             </button>
           </div>
         </div>
@@ -109,11 +106,22 @@ function PracticeTestModal({
                 ))}
               </select>
             )}
+
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-full bg-background border border-white/10 rounded-lg p-2.5 text-white mt-3"
+            >
+              <option value="">All Years</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
           </div>
         </div>
 
         <button
-          onClick={() => onStart({ mode, count, difficulty, topic: selectedTopic, subtopic: selectedSubtopic })}
+          onClick={() => onStart({ mode, count, difficulty, topic: selectedTopic, subtopic: selectedSubtopic, year: selectedYear })}
           className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-bold hover:bg-primary/90 transition-colors"
         >
           Begin Session
@@ -123,7 +131,7 @@ function PracticeTestModal({
   );
 }
 
-export default function PracticeTestsPage() {
+export default function PYQTestsPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -136,6 +144,7 @@ export default function PracticeTestsPage() {
   const [topics, setTopics] = useState<Record<string, unknown>[]>([]);
   const [subtopics, setSubtopics] = useState<Record<string, unknown>[]>([]);
   const [topicStats, setTopicStats] = useState<Record<string, unknown>[]>([]);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -170,13 +179,21 @@ export default function PracticeTestsPage() {
       if (user) {
         try {
           const token = await user.getIdToken();
-          const res = await fetch('/api/practice-tests/stats', {
+          const res = await fetch('/api/practice-tests/stats?mode=pyq', {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (res.ok) {
             const data = await res.json();
             questionCounts = data.questions;
             userAttempts = data.attempts;
+          }
+          
+          const yearRes = await fetch('/api/pyq-tests/years', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (yearRes.ok) {
+            const yearData = await yearRes.json();
+            setAvailableYears(yearData.years || []);
           }
         } catch (_e) {}
       }
@@ -248,11 +265,12 @@ export default function PracticeTestsPage() {
     );
   }
 
-  const handleStart = (cfg: { mode: string, count: number, difficulty: string, topic?: string, subtopic?: string }) => {
+  const handleStart = (cfg: { mode: string, count: number, difficulty: string, topic?: string, subtopic?: string, year?: string }) => {
     if (modalSubject) {
       let url = `/test-interface?mode=${cfg.mode}&subject=${encodeURIComponent(modalSubject)}&count=${cfg.count}&difficulty=${encodeURIComponent(cfg.difficulty)}`;
       if (cfg.topic) url += `&topic=${encodeURIComponent(cfg.topic)}`;
       if (cfg.subtopic) url += `&subtopic=${encodeURIComponent(cfg.subtopic)}`;
+      if (cfg.year) url += `&year=${encodeURIComponent(cfg.year)}`;
       router.push(url);
     }
   };
@@ -260,10 +278,11 @@ export default function PracticeTestsPage() {
   return (
     <ProtectedRoute>
       {modalSubject && (
-        <PracticeTestModal 
+        <PYQTestModal 
           subjectName={modalSubject} 
           topics={topics.filter(t => t.subject_id === subjects.find(s => s.name === modalSubject)?.id)}
           subtopics={subtopics}
+          availableYears={availableYears}
           onClose={() => setModalSubject(null)} 
           onStart={handleStart} 
         />
@@ -315,8 +334,8 @@ export default function PracticeTestsPage() {
         {/* Main Content Area */}
         <main className="flex-1">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white tracking-tight">Practice Questions</h1>
-            <p className="text-gray-400 mt-2">Master topics through targeted question banks.</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Previous Year Questions</h1>
+            <p className="text-gray-400 mt-2">Master topics through authentic UPSC PYQs.</p>
           </div>
 
           {/* Topic Cards Grid */}

@@ -165,6 +165,7 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
             <tr className="border-b border-white/10">
               <th className="pb-3 text-sm font-medium text-gray-400">Subject</th>
               <th className="pb-3 text-sm font-medium text-gray-400">Topic</th>
+              <th className="pb-3 text-sm font-medium text-gray-400">Subtopic</th>
               <th className="pb-3 text-sm font-medium text-gray-400">Question</th>
               <th className="pb-3 text-sm font-medium text-gray-400">Diff</th>
               <th className="pb-3 text-sm font-medium text-gray-400 text-right">Actions</th>
@@ -174,14 +175,15 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
             {isLoading ? (
               <tr><td colSpan={5} className="py-8 text-center text-gray-500">Loading questions via FTS...</td></tr>
             ) : error || data?.error ? (
-              <tr><td colSpan={5} className="py-8 text-center text-red-400">{error?.message || data?.error}</td></tr>
+              <tr><td colSpan={6} className="py-8 text-center text-red-400">{error?.message || data?.error}</td></tr>
             ) : questions.length === 0 ? (
-              <tr><td colSpan={5} className="py-8 text-center text-gray-500">No questions found.</td></tr>
+              <tr><td colSpan={6} className="py-8 text-center text-gray-500">No questions found.</td></tr>
             ) : (
               questions.map((q: Record<string, unknown>) => (
                 <tr key={q.id as string} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                  <td className="py-3 text-gray-300 pr-4">{q.subject as string}</td>
-                  <td className="py-3 text-gray-300 pr-4">{q.topic as string}</td>
+                  <td className="py-3 text-gray-400 pr-4">{q.subject as string}</td>
+                  <td className="py-3 text-gray-400 pr-4">{q.topic as string}</td>
+                  <td className="py-3 text-gray-500 text-xs pr-4">{q.subtopic ? (q.subtopic as string) : '-'}</td>
                   <td className="py-3 text-gray-300 pr-4">
                     <div className="max-w-md truncate">{q.question_text as string}</div>
                   </td>

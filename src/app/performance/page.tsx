@@ -171,7 +171,7 @@ export default function PerformancePage() {
       }
     };
     load();
-  }, [user?.uid]); // depend on uid specifically
+  }, [user]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#121212]">

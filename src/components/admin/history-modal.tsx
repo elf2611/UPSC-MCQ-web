@@ -30,7 +30,7 @@ export function HistoryModal({ questionId, onClose, onRestored }: { questionId: 
     };
 
     fetchHistory();
-  }, [questionId]);
+  }, [questionId, user]);
 
   const handleRestore = async (historyId: string) => {
     if (!confirm("Are you sure you want to restore this version? The current version will be saved in history.")) return;

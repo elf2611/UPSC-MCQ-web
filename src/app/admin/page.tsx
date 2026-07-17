@@ -20,11 +20,14 @@ function AdminInner() {
   // Subjects & Topics State
   const [subjects, setSubjects] = useState<Record<string, unknown>[]>([]);
   const [topics, setTopics] = useState<Record<string, unknown>[]>([]);
+  const [subtopics, setSubtopics] = useState<Record<string, unknown>[]>([]);
   const [newSubName, setNewSubName] = useState("");
   const [newSubColor, setNewSubColor] = useState("#6366f1");
   const [newSubIcon, setNewSubIcon] = useState("📚");
   const [addingTopicTo, setAddingTopicTo] = useState<string | null>(null);
   const [newTopicName, setNewTopicName] = useState("");
+  const [addingSubtopicTo, setAddingSubtopicTo] = useState<string | null>(null);
+  const [newSubtopicName, setNewSubtopicName] = useState("");
 
   // AI Generator State
   const [importMethod, setImportMethod] = useState<"pdf" | "json" | "text">("pdf");
@@ -62,15 +65,19 @@ function AdminInner() {
   const fetchSubjectsAndTopics = async () => {
     const { data: s } = await supabase.from("subjects").select("*").order("name");
     const { data: t } = await supabase.from("topics").select("*").order("name");
+    const { data: st } = await supabase.from("subtopics").select("*").order("name");
     if (s) setSubjects(s);
     if (t) setTopics(t);
+    if (st) setSubtopics(st);
   };
 
   const fetchSubjects = async () => {
     const { data: s } = await supabase.from("subjects").select("*").order("name");
     const { data: t } = await supabase.from("topics").select("*").order("name");
+    const { data: st } = await supabase.from("subtopics").select("*").order("name");
     if (s) setSubjects(s);
     if (t) setTopics(t);
+    if (st) setSubtopics(st);
   };
   const handleCancelEdit = () => {
     setEditingQuestion(null);
@@ -127,6 +134,41 @@ function AdminInner() {
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       alert("Failed to delete topic: " + (errorData.error || res.statusText));
+      return;
+    }
+    fetchSubjects();
+  };
+
+  const handleAddSubtopic = async (topicId: string) => {
+    if(!newSubtopicName.trim()) return;
+    const slug = newSubtopicName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    
+    const token = await user?.getIdToken();
+    const res = await fetch('/api/admin/subtopics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ name: newSubtopicName, slug, topic_id: topicId })
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      alert("Failed to add subtopic: " + (errorData.error || res.statusText));
+      return;
+    }
+    
+    setNewSubtopicName("");
+    setAddingSubtopicTo(null);
+    fetchSubjects();
+  };
+
+  const handleDeleteSubtopic = async (id: string) => {
+    const token = await user?.getIdToken();
+    const res = await fetch(`/api/admin/subtopics?id=${id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      alert("Failed to delete subtopic: " + (errorData.error || res.statusText));
       return;
     }
     fetchSubjects();
@@ -311,6 +353,7 @@ function AdminInner() {
               initialData={editingQuestion || undefined}
               subjects={subjects}
               topics={topics}
+              subtopics={subtopics}
               onSuccess={() => {
                 setEditingQuestion(null);
                 setActiveTab("manage");
@@ -353,9 +396,30 @@ function AdminInner() {
                   
                   <div className="space-y-2 mb-4">
                     {topics.filter(t => t.subject_id === s.id).map(t => (
-                      <div key={t.id as string} className="flex justify-between items-center bg-white/5 p-2 rounded-md">
-                        <span className="text-sm text-gray-300">{t.name as string}</span>
-                        <button onClick={() => handleDeleteTopic(t.id as string)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
+                      <div key={t.id as string} className="flex flex-col bg-white/5 p-3 rounded-md">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-gray-300">{t.name as string}</span>
+                          <button onClick={() => handleDeleteTopic(t.id as string)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                        
+                        {/* Subtopics UI inside Topic */}
+                        <div className="pl-4 border-l border-white/10 space-y-1 mt-1">
+                          {subtopics.filter(st => st.topic_id === t.id).map(st => (
+                            <div key={st.id as string} className="flex justify-between items-center py-1">
+                              <span className="text-xs text-gray-400">• {st.name as string}</span>
+                              <button onClick={() => handleDeleteSubtopic(st.id as string)} className="text-red-500 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
+                            </div>
+                          ))}
+                          
+                          {addingSubtopicTo === t.id ? (
+                            <div className="flex gap-2 mt-2">
+                              <input type="text" autoFocus value={newSubtopicName} onChange={e=>setNewSubtopicName(e.target.value)} className="flex-1 bg-background border border-white/10 rounded-md py-1 px-2 text-xs text-white" placeholder="Subtopic..." />
+                              <button onClick={() => handleAddSubtopic(t.id as string)} className="bg-green-500/20 text-green-400 px-2 py-1 rounded-md text-xs">Save</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setAddingSubtopicTo(t.id as string); setNewSubtopicName(""); }} className="text-xs text-primary hover:underline flex items-center gap-1 mt-1">+ subtopic</button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

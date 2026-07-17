@@ -50,6 +50,7 @@ const QuestionSchema = z.object({
   elimination_tip: z.string().default(''),
   subject: z.string().default(''),
   topic: z.string().default(''),
+  subtopic: z.string().default(''),
   difficulty: z.string().default(''),
   year: z.number().nullable().optional(),
 });
@@ -230,7 +231,7 @@ export async function processChunk(args: ChunkProcessorArgs): Promise<{ question
 
   // 3. Call Gemini
   await updateStatus('Sending to Gemini...');
-  const prompt = `You are extracting UPSC exam MCQs from the following text. Return ONLY a JSON array, no markdown, no explanation. Each object must have exactly these fields: question_text, option_a, option_b, option_c, option_d, correct_option (one of "a","b","c","d"), explanation, why_a_wrong, why_b_wrong, why_c_wrong, why_d_wrong, elimination_tip, subject, topic, difficulty, year. If a field can't be determined, use an empty string.
+  const prompt = `You are extracting UPSC exam MCQs from the following text. Return ONLY a JSON array, no markdown, no explanation. Each object must have exactly these fields: question_text, option_a, option_b, option_c, option_d, correct_option (one of "a","b","c","d"), explanation, why_a_wrong, why_b_wrong, why_c_wrong, why_d_wrong, elimination_tip, subject, topic, subtopic, difficulty, year. If a field can't be determined, use an empty string. For the year field only, use null if it cannot be determined — never an empty string. year: the actual UPSC exam year this question was asked in, if the source text labels it (e.g. '[2019]', 'UPSC CSE 2020', a year in parentheses near the question). Use null if the source doesn't indicate a specific exam year (i.e., not a genuine PYQ).
 
 Text to extract from:
 ${extractedText}`;

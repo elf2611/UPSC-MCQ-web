@@ -17,6 +17,7 @@ export function Navbar() {
     { name: "Home", href: "/" },
     { name: "Practice Tests", href: "/practice-tests" },
     { name: "Mock Tests", href: "/mock-tests" },
+    { name: "PYQs", href: "/pyq-tests" },
     { name: "Revision", href: "/revision", isRevision: true },
     { name: "Performance", href: "/performance" },
     { name: "Pricing", href: "/pricing" },

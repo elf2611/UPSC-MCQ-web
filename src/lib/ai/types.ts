@@ -31,6 +31,7 @@ export interface GeneratedQuestion {
   estimated_solving_time: number;
   subject: string;
   topic: string;
+  subtopic?: string;
   tags: string[];
   source: string;
   year?: number;

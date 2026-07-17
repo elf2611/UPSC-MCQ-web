@@ -17,6 +17,7 @@ interface Question {
   option_c: string;
   option_d: string;
   correct_option: string;
+  year?: number | null;
   explanation?: string;
   subject?: string;
   subject_id?: string;
@@ -53,10 +54,12 @@ export default function TestInterfaceInner() {
   const mode = searchParams.get("mode") || "practice";
   const subject = searchParams.get("subject") || "";
   const topic = searchParams.get("topic") || "";
+  const subtopic = searchParams.get("subtopic") || "";
   const difficulty = searchParams.get("difficulty") || "All Levels";
   const testId = searchParams.get("test_id") || "";
   const customCount = parseInt(searchParams.get("count") || "20");
   const customTime = parseInt(searchParams.get("time") || "3600");
+  const dateParam = searchParams.get("date") || "";
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +110,7 @@ export default function TestInterfaceInner() {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {})
           },
-          body: JSON.stringify({ mode, subject, topic, difficulty, testId, customCount })
+          body: JSON.stringify({ mode, subject, topic, subtopic, difficulty, testId, customCount, date: dateParam })
         });
         
         if (res.ok) {
@@ -116,7 +119,7 @@ export default function TestInterfaceInner() {
         }
 
         if (mode === "practice" || mode === "test") {
-          setTestName(topic ? `${topic} Practice` : `${subject} Practice`);
+          setTestName(subtopic ? `${subtopic} Practice` : topic ? `${topic} Practice` : `${subject} Practice`);
           setTimeLeft(3600);
         } else if (mode === "mock" && testId) {
           setTestName(`Mock Test #${testId}`);
@@ -124,6 +127,9 @@ export default function TestInterfaceInner() {
         } else if (mode === "custom") {
           setTestName("Custom Test");
           setTimeLeft(customTime);
+        } else if (mode === "current-affairs") {
+          setTestName(`Current Affairs ${dateParam}`);
+          setTimeLeft(1800); // 30 minutes for daily CA test
         }
 
         const finalQuestions = data || [];
@@ -140,7 +146,7 @@ export default function TestInterfaceInner() {
       setLoading(false);
     };
     loadQuestions();
-  }, [mode, subject, topic, difficulty, testId, customCount, customTime]);
+  }, [mode, subject, topic, subtopic, difficulty, testId, customCount, customTime, dateParam, user]);
 
   // Mark question as visited on navigate
   useEffect(() => {
@@ -541,6 +547,18 @@ export default function TestInterfaceInner() {
                 >
                   <Bookmark className={`w-5 h-5 ${bookmarkedQuestions.has(currentQ.id) ? "fill-primary text-primary" : "text-gray-400"}`} />
                 </button>
+                <div className="flex gap-2 mb-2 flex-wrap">
+                  {currentQ.year && (
+                    <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      UPSC {currentQ.year}
+                    </span>
+                  )}
+                  {mode === 'current-affairs' && (
+                    <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      Current Affairs
+                    </span>
+                  )}
+                </div>
                 <p className="text-white text-lg leading-relaxed pr-8">{currentQ.question_text}</p>
               </div>
 

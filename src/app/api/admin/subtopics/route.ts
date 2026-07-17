@@ -2,36 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken, getSupabaseAdmin } from '@/lib/auth-verify';
 import * as z from 'zod';
 
-const questionSchema = z.object({
-  id: z.string().optional(),
-  text: z.string().min(1),
-  option_a: z.string().min(1),
-  option_b: z.string().min(1),
-  option_c: z.string().min(1),
-  option_d: z.string().min(1),
-  correct_answer: z.enum(['A', 'B', 'C', 'D']),
-  explanation: z.string().optional().nullable(),
-  subject_id: z.string().uuid().optional().nullable(),
-  topic_id: z.string().uuid().optional().nullable(),
-  subtopic: z.string().optional().nullable(),
-  difficulty: z.string().optional().nullable(),
-  source: z.string().optional().nullable(),
-  status: z.enum(['staged', 'approved', 'rejected']).optional(),
-  why_a_wrong: z.string().optional().nullable(),
-  why_b_wrong: z.string().optional().nullable(),
-  why_c_wrong: z.string().optional().nullable(),
-  why_d_wrong: z.string().optional().nullable(),
-  elimination_tip: z.string().optional().nullable(),
-  memory_trick: z.string().optional().nullable(),
-  static_topic_link: z.string().optional().nullable(),
-  related_current_affairs: z.string().optional().nullable(),
-  estimated_solving_time: z.number().optional().nullable(),
-  revision_priority: z.string().optional().nullable(),
-  year: z.number().optional().nullable(),
-  article_date: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional().nullable(),
-  language: z.string().optional().nullable(),
-  created_by: z.string().optional().nullable(),
+const subtopicSchema = z.object({
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  topic_id: z.string().uuid(),
 });
 
 export async function POST(request: NextRequest) {
@@ -42,16 +16,11 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = await request.json();
-    const validatedData = questionSchema.parse(payload);
-    
-    // Default status is 'approved' for questions created manually by admin
-    if (!validatedData.status) {
-      validatedData.status = 'approved';
-    }
+    const validatedData = subtopicSchema.parse(payload);
 
     const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
-      .from('questions')
+      .from('subtopics')
       .insert([validatedData])
       .select()
       .single();
@@ -79,12 +48,12 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
 
     if (!id) {
-      return NextResponse.json({ error: 'Question ID is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Subtopic ID is required' }, { status: 400 });
     }
 
     const supabaseAdmin = getSupabaseAdmin();
     const { error } = await supabaseAdmin
-      .from('questions')
+      .from('subtopics')
       .delete()
       .eq('id', id);
 

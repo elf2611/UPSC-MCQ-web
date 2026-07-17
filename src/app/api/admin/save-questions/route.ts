@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
         difficulty:     String(q.difficulty || 'medium').toLowerCase().trim(),
         subject:        String(q.subject || '').trim(),
         topic:          String(q.topic || '').trim(),
+        subtopic:       String(q.subtopic || '').trim(),
         why_a_wrong:       String(q.why_a_wrong || q.option_a_explanation || '').trim(),
         why_b_wrong:       String(q.why_b_wrong || q.option_b_explanation || '').trim(),
         why_c_wrong:       String(q.why_c_wrong || q.option_c_explanation || '').trim(),
@@ -102,6 +103,7 @@ export async function POST(request: NextRequest) {
         tags:              Array.isArray(q.tags) ? q.tags : [],
         language:          String(q.language || 'en'),
         created_by:        userId,
+        article_date:      q.article_date ? String(q.article_date) : null,
       };
 
       validQuestions.push(row);

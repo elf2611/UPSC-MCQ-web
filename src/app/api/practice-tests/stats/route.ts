@@ -10,8 +10,14 @@ export async function GET(request: NextRequest) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const { uid } = authResult;
+    const mode = request.nextUrl.searchParams.get("mode");
 
-    const { data: questions, error: qError } = await supabaseAdmin.from("questions").select("id, subject_id");
+    let qQuery = supabaseAdmin.from("questions").select("id, subject_id");
+    if (mode === "pyq") {
+      qQuery = qQuery.not("year", "is", null);
+    }
+
+    const { data: questions, error: qError } = await qQuery;
     if (qError) throw new Error(qError.message);
 
     const { data: attempts, error: aError } = await supabaseAdmin.from("question_attempts").select("question_id, is_correct").eq("user_id", uid);

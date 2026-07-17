@@ -112,10 +112,12 @@ export async function GET(req: Request) {
             elimination_tip: q.elimination_tip || '',
             subject: q.subject,
             topic: q.topic,
+            subtopic: q.subtopic || '',
             difficulty: q.difficulty.toLowerCase(),
             year: q.year || null,
             source: 'current-affairs',
-            status: 'pending' // pending admin approval
+            status: 'pending', // pending admin approval
+            article_date: article.article_date
           };
         });
 

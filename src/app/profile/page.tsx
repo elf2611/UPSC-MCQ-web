@@ -77,7 +77,7 @@ export default function ProfilePage() {
       } catch (_e) {}
     };
     loadHistory();
-  }, [user?.uid]);
+  }, [user]);
 
   const handleSaveAccount = async () => {
     if (!user) return;

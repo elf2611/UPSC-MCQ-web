@@ -11,8 +11,9 @@ export const questionSchema = z.object({
   id: z.string().optional(),
   subject: z.string().min(1, "Subject is required"),
   topic: z.string().min(1, "Topic is required"),
+  subtopic: z.string().optional(),
   difficulty: z.enum(["easy", "medium", "hard"]),
-  year: z.coerce.number().min(1950).max(new Date().getFullYear() + 1),
+  year: z.coerce.number().min(1950).max(new Date().getFullYear() + 1).nullable().optional().or(z.literal("").transform(() => null)),
   question_text: z.string().min(10, "Question must be at least 10 characters"),
   option_a: z.string().min(1, "Option A is required"),
   option_b: z.string().min(1, "Option B is required"),
@@ -42,11 +43,12 @@ interface QuestionFormProps {
   initialData?: QuestionFormValues;
   subjects: Record<string, unknown>[];
   topics: Record<string, unknown>[];
+  subtopics?: Record<string, unknown>[];
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function QuestionForm({ initialData, subjects, topics, onSuccess, onCancel }: QuestionFormProps) {
+export function QuestionForm({ initialData, subjects, topics, subtopics = [], onSuccess, onCancel }: QuestionFormProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -139,6 +141,17 @@ export function QuestionForm({ initialData, subjects, topics, onSuccess, onCance
               ))}
             </select>
             {form.formState.errors.topic && <p className="text-red-400 text-xs mt-1">{form.formState.errors.topic.message as string}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Subtopic (Optional)</label>
+            <select {...form.register("subtopic")} className="w-full bg-background border border-white/10 rounded-lg p-2.5 text-white">
+              <option value="">No Subtopic</option>
+              {subtopics.filter(st => st.topic_id === topics.find(t => t.name === form.watch("topic"))?.id).map(st => (
+                <option key={st.id as string} value={st.name as string}>{st.name as string}</option>
+              ))}
+            </select>
+            {form.formState.errors.subtopic && <p className="text-red-400 text-xs mt-1">{form.formState.errors.subtopic.message as string}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
