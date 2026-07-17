@@ -11,7 +11,6 @@ import {
   User as FirebaseUser,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { supabase } from "@/lib/supabase";
 
 interface UserProfile {
   id: string;
@@ -41,34 +40,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Sync with Supabase profiles table
+  // Sync with Supabase profiles table via secure API
   const syncProfile = async (firebaseUser: FirebaseUser, name?: string) => {
     try {
-      // Check if profile exists
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", firebaseUser.uid)
-        .single();
-
-      if (error && error.code !== "PGRST116") { // not found
-        console.error("Error fetching profile:", error);
-      }
-
-      if (!data) {
-        // Create new profile
-        const displayName = name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User';
-        const newProfile = {
-          id: firebaseUser.uid,
-          name: displayName,
-          email: firebaseUser.email,
-          plan: "free",
-        };
-        const { error: insertError } = await supabase.from("profiles").insert(newProfile);
-        if (insertError) console.error("Error creating profile:", insertError);
-        setProfile(newProfile as UserProfile);
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch('/api/auth/sync-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          name: name || firebaseUser.displayName, 
+          email: firebaseUser.email 
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data.profile);
       } else {
-        setProfile(data as UserProfile);
+        console.error("Error syncing profile:", await res.text());
       }
     } catch (err) {
       console.error("Profile sync error:", err);

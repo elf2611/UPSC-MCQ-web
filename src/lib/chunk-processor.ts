@@ -142,7 +142,8 @@ async function callGeminiWithRetry(prompt: string, onStatus: (msg: string) => vo
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
 
-      const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+      const modelName = process.env.GEMINI_MODEL;
+      if (!modelName) throw new Error("GEMINI_MODEL is not configured on the server.");
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {

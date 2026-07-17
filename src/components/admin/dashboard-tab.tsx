@@ -28,7 +28,7 @@ export function DashboardTab() {
     });
     if (!res.ok) {
       const err = new Error("Failed to fetch dashboard");
-      (err as any).status = res.status;
+      (err as Error & { status?: number }).status = res.status;
       throw err;
     }
     const data = await res.json();
@@ -44,7 +44,8 @@ export function DashboardTab() {
     { 
       refreshInterval: shouldPoll ? 10000 : 0,
       onError: (err) => {
-        if ((err as any).status === 401 || (err as any).status === 403) {
+        const errorWithStatus = err as Error & { status?: number };
+        if (errorWithStatus.status === 401 || errorWithStatus.status === 403) {
           setFailures(prev => prev + 1);
         }
       },

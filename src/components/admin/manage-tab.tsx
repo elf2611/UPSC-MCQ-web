@@ -26,7 +26,7 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
     });
     if (!res.ok) {
       const err = new Error("Failed to fetch data");
-      (err as any).status = res.status;
+      (err as Error & { status?: number }).status = res.status;
       throw err;
     }
     return res.json();

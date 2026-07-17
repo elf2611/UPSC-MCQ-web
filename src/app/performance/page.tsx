@@ -3,7 +3,7 @@
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer
@@ -107,61 +107,45 @@ export default function PerformancePage() {
 
     const load = async () => {
       try {
-        // 1. Fetch Profile
-        const { data: pData } = await supabase.from("profiles").select("xp, level, streak_count").eq("id", uid).single();
-        if (pData) setProfile(pData);
-
-        // 2. Fetch Recent Tests (order by submitted_at)
-        const { data: testData, error: testError } = await supabase
-          .from("test_attempts")
-          .select("*")
-          .eq("user_id", uid)
-          .order("submitted_at", { ascending: false })
-          .limit(10);
-        console.log('Attempts fetched:', testData?.length, testError);
-        if (testData) setAttempts(testData);
-
-        // 3. Compute total practiced & accuracy from attempt_answers
-        const attemptIds = (testData || []).map((a: Record<string, unknown>) => a.id);
-        let totalPracticedCount = 0;
-        let totalCorrectCount = 0;
-        const heatCounts: Record<string, number> = {};
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-        const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
-
-        if (attemptIds.length > 0) {
-          const { data: answersData } = await supabase
-            .from("attempt_answers")
-            .select("is_correct, created_at")
-            .in("attempt_id", attemptIds);
-
-          if (answersData) {
-            totalPracticedCount = answersData.length;
-            totalCorrectCount = answersData.filter((a: Record<string, unknown>) => a.is_correct).length;
-            answersData.forEach((row: Record<string, unknown>) => {
-              if (row.created_at) {
-                const d = (row.created_at as string).split("T")[0];
-                if (d >= ninetyStr) heatCounts[d] = (heatCounts[d] || 0) + 1;
-              }
-            });
-          }
-        }
-        setTotalPracticed(totalPracticedCount);
-        setOverallAccuracy(totalPracticedCount > 0 ? Math.round((totalCorrectCount / totalPracticedCount) * 100) : 0);
-        setHeatmapMap(heatCounts);
-
-        // 4. Fetch Weak Subjects from user_statistics
-        const { data: weakData } = await supabase
-          .from("user_statistics")
-          .select("accuracy_percent, total_attempted, subject_id")
-          .eq("user_id", uid)
-          .gte("total_attempted", 2)
-          .order("accuracy_percent", { ascending: true })
-          .limit(5);
-
-        if (weakData) {
-          setWeakTopics(weakData.map(w => ({
+        const token = await user.getIdToken();
+        const res = await fetch('/api/user-statistics', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          
+          // 1. Profile
+          setProfile(data.profile);
+          
+          // 2. Attempts
+          const testData = data.tests;
+          setAttempts(testData);
+          
+          // 3. Compute accuracy & heatmap
+          const answersData = data.answers;
+          const totalPracticedCount = answersData.length;
+          const totalCorrectCount = answersData.filter((a: Record<string, unknown>) => a.is_correct).length;
+          
+          const heatCounts: Record<string, number> = {};
+          const ninetyDaysAgo = new Date();
+          ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+          const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
+          
+          answersData.forEach((row: Record<string, unknown>) => {
+            if (typeof row.created_at === 'string') {
+              const d = row.created_at.split("T")[0];
+              if (d >= ninetyStr) heatCounts[d] = (heatCounts[d] || 0) + 1;
+            }
+          });
+          
+          setTotalPracticed(totalPracticedCount);
+          setOverallAccuracy(totalPracticedCount > 0 ? Math.round((totalCorrectCount / totalPracticedCount) * 100) : 0);
+          setHeatmapMap(heatCounts);
+          
+          // 4. Weak Topics
+          const weakData = data.weakTopics;
+          setWeakTopics(weakData.map((w: Record<string, unknown>) => ({
             topic_name: w.subject_id || "Unknown Subject",
             topic_slug: "",
             subject_name: w.subject_id || "Unknown Subject",
@@ -169,20 +153,14 @@ export default function PerformancePage() {
             accuracy: Number(w.accuracy_percent),
             attempted: Number(w.total_attempted)
           })));
-        }
-
-        // 5. Fetch Badges
-        const { data: badgeData } = await supabase
-          .from("achievements")
-          .select("badge_name, earned_at")
-          .eq("user_id", uid);
-
-        if (badgeData) {
-          const earnedMap = new Map(badgeData.map(b => [b.badge_name, b.earned_at]));
+          
+          // 5. Badges
+          const badgeData = data.badges;
+          const earnedMap = new Map<string, string | undefined>(badgeData.map((b: Record<string, unknown>) => [b.badge_name as string, b.earned_at as string | undefined]));
           const mergedBadges = ALL_BADGES.map(b => ({
             ...b,
             earned: earnedMap.has(b.name),
-            earnedAt: earnedMap.get(b.name)
+            earnedAt: earnedMap.get(b.name) as string | undefined
           }));
           setBadges(mergedBadges);
         }

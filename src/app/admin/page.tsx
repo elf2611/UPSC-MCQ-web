@@ -10,7 +10,9 @@ import { ManageTab } from "@/components/admin/manage-tab";
 import { useAuth } from "@/hooks/useAuth";
 import { QuestionForm, QuestionFormValues } from "@/components/admin/question-form";
 
-export default function AdminPage() {
+import { ErrorBoundary } from "@/components/error-boundary";
+
+function AdminInner() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "add" | "manage" | "subjects" | "generator">("dashboard");
   const [editingQuestion, setEditingQuestion] = useState<QuestionFormValues | null>(null);
   const { user } = useAuth();
@@ -276,7 +278,6 @@ export default function AdminPage() {
               initialData={editingQuestion || undefined}
               subjects={subjects}
               topics={topics}
-              userId={user?.uid as string}
               onSuccess={() => {
                 setEditingQuestion(null);
                 setActiveTab("manage");
@@ -655,5 +656,13 @@ export default function AdminPage() {
         )}
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <ErrorBoundary fallbackMessage="The Admin Dashboard encountered an unexpected error.">
+      <AdminInner />
+    </ErrorBoundary>
   );
 }

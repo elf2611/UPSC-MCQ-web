@@ -1,8 +1,8 @@
 "use client";
 
 import { ProtectedRoute } from "@/components/protected-route";
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { useState, useEffect, useRef } from "react";
+
 import { useAuth } from "@/hooks/useAuth";
 import { CheckCircle2, XCircle, Activity, Calendar as CalIcon } from "lucide-react";
 import Link from "next/link";
@@ -51,59 +51,58 @@ export default function RevisionPage() {
   const [longestInterval, setLongestInterval] = useState(0);
   const [nextReviewDate, setNextReviewDate] = useState<number | null>(null);
 
+  const batchRef = useRef<Record<string, unknown>[]>([]);
+
+  // Flush batch on interval or unmount
+  useEffect(() => {
+    const flushBatch = async () => {
+      if (batchRef.current.length === 0 || !user) return;
+      const updates = [...batchRef.current];
+      batchRef.current = []; // clear immediately to prevent double send
+      
+      try {
+        const token = await user.getIdToken();
+        await fetch('/api/revision-queue', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            action: 'batch_update_confidence',
+            updates
+          })
+        });
+      } catch (e) {
+        // on failure, we could push them back, but let's keep it simple for now
+        console.error("Batch update failed", e);
+      }
+    };
+
+    const interval = setInterval(flushBatch, 10000); // 10s
+    return () => {
+      clearInterval(interval);
+      flushBatch(); // flush on unmount
+    };
+  }, [user]);
+
   // Load Data
   useEffect(() => {
     if (!user) return;
 
     const loadData = async () => {
-      const todayStr = new Date().toISOString().split("T")[0];
-
-      // 1. Fetch due questions
-      const { data: qData } = await supabase
-        .from("revision_queue")
-        .select("*, questions(*)")
-        .eq("user_id", user.uid)
-        .lte("next_review_date", todayStr);
-
-      if (qData) {
-        setQueue(qData as unknown as RevisionItem[]);
-      }
-
-      // 2. Fetch future if empty
-      if (!qData || qData.length === 0) {
-        const { data: future } = await supabase
-          .from("revision_queue")
-          .select("next_review_date")
-          .eq("user_id", user.uid)
-          .gt("next_review_date", todayStr)
-          .order("next_review_date", { ascending: true })
-          .limit(1);
-
-        if (future && future.length > 0) {
-          const futureDate = new Date(future[0].next_review_date);
-          const diffTime = futureDate.getTime() - new Date().getTime();
-          setNextReviewDate(Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-        }
-      }
-
-      // 3. Fetch heatmap data (last 90 days)
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
-
-      const { data: hData } = await supabase
-        .from("question_attempts")
-        .select("attempt_date")
-        .eq("user_id", user.uid)
-        .gte("attempt_date", ninetyStr);
-
-      if (hData) {
-        const counts: Record<string, number> = {};
-        hData.forEach(row => {
-          counts[row.attempt_date] = (counts[row.attempt_date] || 0) + 1;
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/revision-queue', {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-        setHeatmapMap(counts);
-      }
+        if (res.ok) {
+          const data = await res.json();
+          setQueue(data.queue as RevisionItem[]);
+          setNextReviewDate(data.nextReviewDate);
+          setHeatmapMap(data.heatmapMap);
+        }
+      } catch (_e) {}
 
       setLoading(false);
     };
@@ -152,31 +151,16 @@ export default function RevisionPage() {
     nextReview.setDate(nextReview.getDate() + newInterval);
     const nextReviewStr = nextReview.toISOString().split("T")[0];
 
-    // Update Revision Queue
-    await supabase.from("revision_queue").update({
+    // Add to batch instead of API call immediately
+    batchRef.current.push({
+      id: item.id,
       interval_days: newInterval,
       ease_factor: newEase,
       repetitions: newRepetitions,
       next_review_date: nextReviewStr,
-      updated_at: new Date().toISOString()
-    }).eq("id", item.id);
-
-    // Update Profile XP
-    const { error: rpcError } = await supabase.rpc('increment_xp', { user_id: user.uid, xp_amount: earnedXp });
-    if (rpcError) {
-      // Fallback if RPC doesn't exist
-      supabase.from("profiles").select("xp").eq("id", user.uid).single().then(({data}) => {
-        if (data) supabase.from("profiles").update({ xp: data.xp + earnedXp }).eq("id", user.uid).then();
-      });
-    }
-
-    // Log Attempt
-    const todayStr = new Date().toISOString().split("T")[0];
-    await supabase.from("question_attempts").insert({
-      user_id: user.uid,
       question_id: item.question_id,
       is_correct: isCorrect,
-      attempt_date: todayStr
+      earnedXp
     });
 
     // Advance

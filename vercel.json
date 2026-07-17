@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/current-affairs/fetch-articles",
+      "schedule": "30 22 * * *"
+    },
+    {
+      "path": "/api/current-affairs/generate-questions",
+      "schedule": "45 22 * * *"
+    }
+  ]
+}

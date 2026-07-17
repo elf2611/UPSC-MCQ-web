@@ -20,7 +20,7 @@ export default function LogsPage() {
     });
     if (!res.ok) {
       const err = new Error("Failed to fetch logs");
-      (err as any).status = res.status;
+      (err as Error & { status?: number }).status = res.status;
       throw err;
     }
     return res.json();

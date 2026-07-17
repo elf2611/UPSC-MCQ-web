@@ -1,0 +1,1806 @@
+﻿diff --git a/src/app/admin/logs/page.tsx b/src/app/admin/logs/page.tsx
+index d786d5b..c3430e9 100644
+--- a/src/app/admin/logs/page.tsx
++++ b/src/app/admin/logs/page.tsx
+@@ -20,7 +20,7 @@ export default function LogsPage() {
+     });
+     if (!res.ok) {
+       const err = new Error("Failed to fetch logs");
+-      (err as any).status = res.status;
++      (err as Error & { status?: number }).status = res.status;
+       throw err;
+     }
+     return res.json();
+diff --git a/src/app/admin/page.tsx b/src/app/admin/page.tsx
+index 2a83f6f..bf7b664 100644
+--- a/src/app/admin/page.tsx
++++ b/src/app/admin/page.tsx
+@@ -10,7 +10,9 @@ import { ManageTab } from "@/components/admin/manage-tab";
+ import { useAuth } from "@/hooks/useAuth";
+ import { QuestionForm, QuestionFormValues } from "@/components/admin/question-form";
+ 
+-export default function AdminPage() {
++import { ErrorBoundary } from "@/components/error-boundary";
++
++function AdminInner() {
+   const [activeTab, setActiveTab] = useState<"dashboard" | "add" | "manage" | "subjects" | "generator">("dashboard");
+   const [editingQuestion, setEditingQuestion] = useState<QuestionFormValues | null>(null);
+   const { user } = useAuth();
+@@ -276,7 +278,6 @@ export default function AdminPage() {
+               initialData={editingQuestion || undefined}
+               subjects={subjects}
+               topics={topics}
+-              userId={user?.uid as string}
+               onSuccess={() => {
+                 setEditingQuestion(null);
+                 setActiveTab("manage");
+@@ -657,3 +658,11 @@ export default function AdminPage() {
+     </ProtectedRoute>
+   );
+ }
++
++export default function AdminPage() {
++  return (
++    <ErrorBoundary fallbackMessage="The Admin Dashboard encountered an unexpected error.">
++      <AdminInner />
++    </ErrorBoundary>
++  );
++}
+diff --git a/src/app/api/auth/sync-profile/route.ts b/src/app/api/auth/sync-profile/route.ts
+new file mode 100644
+index 0000000..5f7fe06
+--- /dev/null
++++ b/src/app/api/auth/sync-profile/route.ts
+@@ -0,0 +1,43 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
++
++export async function POST(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const { name, email } = await request.json();
++    const supabaseAdmin = getSupabaseAdmin();
++    const { uid } = authResult;
++
++    // Check if profile exists
++    const { data: profile } = await supabaseAdmin
++      .from("profiles")
++      .select("*")
++      .eq("id", uid)
++      .single();
++
++    if (profile) {
++      return NextResponse.json({ profile });
++    }
++
++    // Create new profile
++    const displayName = name || email?.split('@')[0] || 'User';
++    const newProfile = {
++      id: uid,
++      name: displayName,
++      email: email,
++      plan: "free",
++      role: "student"
++    };
++
++    const { error: insertError } = await supabaseAdmin.from("profiles").insert(newProfile);
++    if (insertError) throw new Error(insertError.message);
++
++    return NextResponse.json({ profile: newProfile });
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/bookmarks/route.ts b/src/app/api/bookmarks/route.ts
+new file mode 100644
+index 0000000..8e7ff45
+--- /dev/null
++++ b/src/app/api/bookmarks/route.ts
+@@ -0,0 +1,56 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
++
++export async function GET(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const supabaseAdmin = getSupabaseAdmin();
++    const { data, error } = await supabaseAdmin
++      .from("bookmarks")
++      .select("question_id")
++      .eq("user_id", authResult.uid);
++
++    if (error) throw new Error((error as Error).message);
++
++    return NextResponse.json({ bookmarks: data || [] });
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
++
++export async function POST(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const { question_id, action } = await request.json();
++    const supabaseAdmin = getSupabaseAdmin();
++    
++    if (action === 'add') {
++      const { error } = await supabaseAdmin.from("bookmarks").insert({
++        user_id: authResult.uid,
++        question_id,
++        folder_name: 'General'
++      });
++      if (error) throw new Error((error as Error).message);
++    } else if (action === 'remove') {
++      const { error } = await supabaseAdmin.from("bookmarks").delete().match({
++        user_id: authResult.uid,
++        question_id
++      });
++      if (error) throw new Error((error as Error).message);
++    } else {
++       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
++    }
++
++    return NextResponse.json({ success: true });
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/current-affairs/fetch-articles/route.ts b/src/app/api/current-affairs/fetch-articles/route.ts
+new file mode 100644
+index 0000000..0d2eb70
+--- /dev/null
++++ b/src/app/api/current-affairs/fetch-articles/route.ts
+@@ -0,0 +1,119 @@
++import { NextResponse } from 'next/server';
++import { createClient } from '@supabase/supabase-js';
++import * as cheerio from 'cheerio';
++import { JSDOM } from 'jsdom';
++import { Readability } from '@mozilla/readability';
++import { CURRENT_AFFAIRS_SOURCES } from '@/lib/current-affairs/sources';
++
++export async function GET(req: Request) {
++  // 1. Verify cron secret to prevent unauthorized execution
++  const authHeader = req.headers.get('authorization');
++  if (
++    process.env.CRON_SECRET && 
++    authHeader !== `Bearer ${process.env.CRON_SECRET}`
++  ) {
++    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
++  }
++
++  try {
++    const supabaseAdmin = createClient(
++      process.env.NEXT_PUBLIC_SUPABASE_URL!,
++      process.env.SUPABASE_SERVICE_ROLE_KEY!
++    );
++
++    let newArticlesCount = 0;
++
++    for (const source of CURRENT_AFFAIRS_SOURCES) {
++      console.log(`[Fetch Articles] Processing source: ${source.name}`);
++      try {
++        const response = await fetch(source.url, { 
++          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } 
++        });
++        if (!response.ok) {
++          console.error(`Failed to fetch RSS from ${source.name}: ${response.status}`);
++          continue;
++        }
++
++        const xmlText = await response.text();
++        const $ = cheerio.load(xmlText, { xmlMode: true });
++        
++        // Extract links from items
++        const links: string[] = [];
++        $('item').each((i, el) => {
++          if (i >= 5) return; // Only process the latest 5 articles per source
++          const link = $(el).find('link').text();
++          if (link) links.push(link);
++        });
++
++        for (const link of links) {
++          // Check if article already exists
++          const { data: existing } = await supabaseAdmin
++            .from('daily_current_affairs')
++            .select('id')
++            .eq('source_url', link)
++            .limit(1);
++
++          if (existing && existing.length > 0) {
++            continue; // Skip already processed article
++          }
++
++          // Fetch the article HTML
++          const articleRes = await fetch(link, { 
++            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } 
++          });
++          if (!articleRes.ok) continue;
++
++          const htmlText = await articleRes.text();
++          
++          // Use jsdom and readability to extract clean text
++          const doc = new JSDOM(htmlText, { url: link });
++          const reader = new Readability(doc.window.document);
++          const article = reader.parse();
++
++          if (!article || !article.textContent || article.textContent.length < 500) {
++            console.log(`[Fetch Articles] Skipped ${link} (too short or unreadable)`);
++            continue;
++          }
++
++          const { error: insertError } = await supabaseAdmin
++            .from('daily_current_affairs')
++            .insert({
++              title: article.title || 'Untitled',
++              source_url: link,
++              source_text: article.textContent.trim(),
++            });
++
++          if (insertError) {
++            console.error(`[Fetch Articles] Failed to insert article ${link}:`, insertError);
++          } else {
++            newArticlesCount++;
++          }
++        }
++      } catch (sourceErr) {
++        console.error(`[Fetch Articles] Error processing source ${source.name}:`, sourceErr);
++      }
++    }
++
++    // If new articles were found, create a processing job for generate-questions
++    // Or we could just let the next cron generate questions blindly.
++    // For visibility, let's create a processing job right now so the admin sees it.
++    if (newArticlesCount > 0) {
++      await supabaseAdmin.from('processing_jobs').insert({
++        source_file: `current_affairs_${new Date().toISOString().split('T')[0]}`,
++        status: 'waiting',
++        job_type: 'current_affairs',
++        chunk_start_page: 0,
++        chunk_end_page: newArticlesCount
++      });
++    }
++
++    return NextResponse.json({ 
++      success: true, 
++      new_articles_count: newArticlesCount 
++    });
++
++  } catch (error: unknown) {
++    console.error('[Fetch Articles] Critical Error:', error);
++    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/current-affairs/generate-questions/route.ts b/src/app/api/current-affairs/generate-questions/route.ts
+new file mode 100644
+index 0000000..ed2337d
+--- /dev/null
++++ b/src/app/api/current-affairs/generate-questions/route.ts
+@@ -0,0 +1,163 @@
++import { NextResponse } from 'next/server';
++import { createClient } from '@supabase/supabase-js';
++import { callGemini } from '@/lib/ai/gemini';
++import { GenerateRequestPayload } from '@/lib/ai/types';
++import crypto from 'crypto';
++
++function normalizeHash(text: string): string {
++  const normalized = text.toLowerCase().trim().replace(/\s+/g, ' ');
++  return crypto.createHash('sha256').update(normalized).digest('hex');
++}
++
++export async function GET(req: Request) {
++  // 1. Verify cron secret to prevent unauthorized execution
++  const authHeader = req.headers.get('authorization');
++  if (
++    process.env.CRON_SECRET && 
++    authHeader !== `Bearer ${process.env.CRON_SECRET}`
++  ) {
++    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
++  }
++
++  const supabaseAdmin = createClient(
++    process.env.NEXT_PUBLIC_SUPABASE_URL!,
++    process.env.SUPABASE_SERVICE_ROLE_KEY!
++  );
++
++  try {
++    // 2. Claim a pending job for current affairs (if any)
++    const { data: jobs, error: fetchJobErr } = await supabaseAdmin
++      .from('processing_jobs')
++      .select('*')
++      .eq('job_type', 'current_affairs')
++      .eq('status', 'waiting')
++      .order('created_at', { ascending: true })
++      .limit(1);
++
++    if (fetchJobErr) throw new Error(fetchJobErr.message);
++    
++    let jobId = jobs?.[0]?.id;
++    
++    if (jobId) {
++      await supabaseAdmin
++        .from('processing_jobs')
++        .update({ status: 'processing', updated_at: new Date().toISOString() })
++        .eq('id', jobId);
++    } else {
++      // If no job was explicitly created by fetch-articles, create one now to track this run
++      const { data: newJob } = await supabaseAdmin.from('processing_jobs').insert({
++        source_file: `current_affairs_gen_${new Date().toISOString().split('T')[0]}`,
++        status: 'processing',
++        job_type: 'current_affairs',
++      }).select().single();
++      jobId = newJob?.id;
++    }
++
++    // 3. Fetch unprocessed articles
++    const { data: articles, error: articlesErr } = await supabaseAdmin
++      .from('daily_current_affairs')
++      .select('*')
++      .eq('processed', false)
++      .limit(10); // Process up to 10 articles per run
++
++    if (articlesErr) throw new Error(articlesErr.message);
++
++    if (!articles || articles.length === 0) {
++      await supabaseAdmin
++        .from('processing_jobs')
++        .update({ status: 'completed', status_message: 'No new articles to process' })
++        .eq('id', jobId);
++      return NextResponse.json({ message: 'No new articles' });
++    }
++
++    let totalGenerated = 0;
++
++    // 4. Generate questions for each article
++    for (const article of articles) {
++      const payload: GenerateRequestPayload = {
++        text: `Source: ${article.title}\n\n${article.source_text}`,
++        config: {
++          count: 2, // 1-2 questions per article
++          difficulty: "Mixed",
++          upscLevel: "Prelims",
++          subject: "Current Affairs",
++          topic: "Daily News",
++          language: "English",
++          explanationLength: "Medium",
++          includeEliminationTips: true,
++          autoGenerateTags: true,
++          source: 'current-affairs'
++        }
++      };
++
++      try {
++        const questions = await callGemini(payload);
++        
++        const rowsToInsert = questions.map((q) => {
++          const hash = normalizeHash(q.question_text);
++          return {
++            job_id: jobId, // Link to the processing job
++            question_hash: hash,
++            question_text: q.question_text,
++            option_a: q.option_a,
++            option_b: q.option_b,
++            option_c: q.option_c,
++            option_d: q.option_d,
++            correct_option: q.correct_option.toLowerCase(),
++            explanation: q.explanation,
++            why_a_wrong: q.why_a_wrong || '',
++            why_b_wrong: q.why_b_wrong || '',
++            why_c_wrong: q.why_c_wrong || '',
++            why_d_wrong: q.why_d_wrong || '',
++            elimination_tip: q.elimination_tip || '',
++            subject: q.subject,
++            topic: q.topic,
++            difficulty: q.difficulty.toLowerCase(),
++            year: q.year || null,
++            source: 'current-affairs',
++            status: 'pending' // pending admin approval
++          };
++        });
++
++        if (rowsToInsert.length > 0) {
++          // Insert into staged_questions. Using upsert or ignoring duplicates could be done via RPC
++          // but for now we'll do a simple insert and catch unique constraint errors if they happen.
++          const { error: insertErr } = await supabaseAdmin
++            .from('staged_questions')
++            .insert(rowsToInsert);
++          
++          if (!insertErr) {
++            totalGenerated += rowsToInsert.length;
++          } else {
++             console.error(`[Generate Questions] Failed to insert questions for article ${article.id}:`, insertErr);
++          }
++        }
++
++        // Mark article as processed
++        await supabaseAdmin
++          .from('daily_current_affairs')
++          .update({ processed: true })
++          .eq('id', article.id);
++
++      } catch (geminiErr) {
++        console.error(`[Generate Questions] Failed to generate for article ${article.id}:`, geminiErr);
++      }
++    }
++
++    // 5. Update job status
++    await supabaseAdmin
++      .from('processing_jobs')
++      .update({ 
++        status: 'completed', 
++        status_message: 'Completed successfully',
++        questions_generated: totalGenerated,
++        updated_at: new Date().toISOString()
++      })
++      .eq('id', jobId);
++
++    return NextResponse.json({ success: true, questions_generated: totalGenerated });
++  } catch (error: unknown) {
++    console.error('[Generate Questions] Critical Error:', error);
++    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/get-result/route.ts b/src/app/api/get-result/route.ts
+index 89bf227..d252169 100644
+--- a/src/app/api/get-result/route.ts
++++ b/src/app/api/get-result/route.ts
+@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
+       answers: answersData || []
+     });
+ 
+-  } catch (error: any) {
++  } catch (error: unknown) {
+     console.error("Error in get-result route:", error);
+     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+   }
+diff --git a/src/app/api/practice-tests/stats/route.ts b/src/app/api/practice-tests/stats/route.ts
+new file mode 100644
+index 0000000..c3f08c9
+--- /dev/null
++++ b/src/app/api/practice-tests/stats/route.ts
+@@ -0,0 +1,28 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
++
++export async function GET(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const supabaseAdmin = getSupabaseAdmin();
++    const { uid } = authResult;
++
++    const { data: questions, error: qError } = await supabaseAdmin.from("questions").select("id, subject_id");
++    if (qError) throw new Error(qError.message);
++
++    const { data: attempts, error: aError } = await supabaseAdmin.from("question_attempts").select("question_id, is_correct").eq("user_id", uid);
++    if (aError) throw new Error(aError.message);
++    
++    return NextResponse.json({
++        questions: questions || [],
++        attempts: attempts || []
++    });
++
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/profile/route.ts b/src/app/api/profile/route.ts
+new file mode 100644
+index 0000000..031cb95
+--- /dev/null
++++ b/src/app/api/profile/route.ts
+@@ -0,0 +1,53 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
++
++export async function GET(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const supabaseAdmin = getSupabaseAdmin();
++    const { uid } = authResult;
++
++    // Fetch Profile
++    const { data: profile } = await supabaseAdmin.from("profiles").select("*").eq("id", uid).single();
++
++    // Fetch Recent Tests
++    const { data: testData } = await supabaseAdmin
++      .from("test_attempts")
++      .select("*")
++      .eq("user_id", uid)
++      .order("submitted_at", { ascending: false })
++      .limit(50);
++
++    return NextResponse.json({
++        profile: profile || null,
++        tests: testData || []
++    });
++
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
++
++export async function PUT(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const payload = await request.json();
++    const supabaseAdmin = getSupabaseAdmin();
++    const { uid } = authResult;
++
++    const { error } = await supabaseAdmin.from("profiles").update(payload).eq("id", uid);
++    if (error) throw new Error((error as Error).message);
++
++    return NextResponse.json({ success: true });
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/questions/route.ts b/src/app/api/questions/route.ts
+new file mode 100644
+index 0000000..7ff5aad
+--- /dev/null
++++ b/src/app/api/questions/route.ts
+@@ -0,0 +1,40 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
++
++export async function POST(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const { mode, subject, topic, difficulty, testId, customCount } = await request.json();
++    const supabaseAdmin = getSupabaseAdmin();
++    let query = supabaseAdmin.from("questions").select("*");
++
++    if (mode === "practice" || mode === "test") {
++      if (subject) {
++        // Handle both subject string name and subject_id UUID depending on how it's stored
++        if (subject.length === 36 && subject.includes('-')) {
++          query = query.eq("subject_id", subject);
++        } else {
++          query = query.eq("subject", subject);
++        }
++      }
++      if (topic) query = query.eq("topic", topic);
++      if (difficulty && difficulty !== "All Levels") query = query.eq("difficulty", difficulty);
++      query = query.limit(customCount || 10);
++    } else if (mode === "mock" && testId) {
++      query = query.limit(100);
++    } else if (mode === "custom") {
++      query = query.limit(customCount || 10);
++    }
++
++    const { data, error } = await query;
++    if (error) throw new Error((error as Error).message);
++
++    return NextResponse.json({ questions: data || [] });
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/revision-queue/route.ts b/src/app/api/revision-queue/route.ts
+new file mode 100644
+index 0000000..b64ff1f
+--- /dev/null
++++ b/src/app/api/revision-queue/route.ts
+@@ -0,0 +1,160 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
++
++export async function GET(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const supabaseAdmin = getSupabaseAdmin();
++    const { uid } = authResult;
++    const todayStr = new Date().toISOString().split("T")[0];
++
++    // Fetch due questions
++    const { data: qData, error: qError } = await supabaseAdmin
++      .from("revision_queue")
++      .select("*, questions(*)")
++      .eq("user_id", uid)
++      .lte("next_review_date", todayStr);
++
++    if (qError) throw new Error(qError.message);
++
++    let nextReviewDate = null;
++
++    if (!qData || qData.length === 0) {
++      const { data: future } = await supabaseAdmin
++        .from("revision_queue")
++        .select("next_review_date")
++        .eq("user_id", uid)
++        .gt("next_review_date", todayStr)
++        .order("next_review_date", { ascending: true })
++        .limit(1);
++
++      if (future && future.length > 0) {
++        const futureDate = new Date(future[0].next_review_date);
++        const diffTime = futureDate.getTime() - new Date().getTime();
++        nextReviewDate = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
++      }
++    }
++
++    // Fetch heatmap data (last 90 days)
++    const ninetyDaysAgo = new Date();
++    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
++    const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
++
++    const { data: hData } = await supabaseAdmin
++      .from("question_attempts")
++      .select("attempt_date")
++      .eq("user_id", uid)
++      .gte("attempt_date", ninetyStr);
++
++    const counts: Record<string, number> = {};
++    if (hData) {
++      hData.forEach(row => {
++        counts[row.attempt_date] = (counts[row.attempt_date] || 0) + 1;
++      });
++    }
++
++    return NextResponse.json({
++        queue: qData || [],
++        nextReviewDate,
++        heatmapMap: counts
++    });
++
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
++
++export async function POST(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const { action, id, interval_days, ease_factor, repetitions, next_review_date, question_id, is_correct, earnedXp } = await request.json();
++    const supabaseAdmin = getSupabaseAdmin();
++    const { uid } = authResult;
++
++    if (action === 'update_confidence') {
++        // Update Revision Queue
++        await supabaseAdmin.from("revision_queue").update({
++            interval_days,
++            ease_factor,
++            repetitions,
++            next_review_date,
++            updated_at: new Date().toISOString()
++        }).eq("id", id).eq("user_id", uid); // secure eq user_id
++
++        // Update Profile XP
++        const { error: rpcError } = await supabaseAdmin.rpc('increment_xp', { user_id: uid, xp_amount: earnedXp });
++        if (rpcError) {
++            const { data } = await supabaseAdmin.from("profiles").select("xp").eq("id", uid).single();
++            if (data) {
++                await supabaseAdmin.from("profiles").update({ xp: data.xp + earnedXp }).eq("id", uid);
++            }
++        }
++
++        // Log Attempt
++        const todayStr = new Date().toISOString().split("T")[0];
++        await supabaseAdmin.from("question_attempts").insert({
++            user_id: uid,
++            question_id,
++            is_correct,
++            attempt_date: todayStr
++        });
++        
++        return NextResponse.json({ success: true });
++    }
++
++    if (action === 'batch_update_confidence') {
++        const { updates } = await request.json();
++        const todayStr = new Date().toISOString().split("T")[0];
++
++        let totalXp = 0;
++        const attemptsToInsert = [];
++
++        for (const update of updates) {
++            await supabaseAdmin.from("revision_queue").update({
++                interval_days: update.interval_days,
++                ease_factor: update.ease_factor,
++                repetitions: update.repetitions,
++                next_review_date: update.next_review_date,
++                updated_at: new Date().toISOString()
++            }).eq("id", update.id).eq("user_id", uid);
++
++            totalXp += update.earnedXp;
++
++            attemptsToInsert.push({
++                user_id: uid,
++                question_id: update.question_id,
++                is_correct: update.is_correct,
++                attempt_date: todayStr
++            });
++        }
++
++        if (totalXp > 0) {
++            const { error: rpcError } = await supabaseAdmin.rpc('increment_xp', { user_id: uid, xp_amount: totalXp });
++            if (rpcError) {
++                const { data } = await supabaseAdmin.from("profiles").select("xp").eq("id", uid).single();
++                if (data) {
++                    await supabaseAdmin.from("profiles").update({ xp: data.xp + totalXp }).eq("id", uid);
++                }
++            }
++        }
++
++        if (attemptsToInsert.length > 0) {
++            await supabaseAdmin.from("question_attempts").insert(attemptsToInsert);
++        }
++
++        return NextResponse.json({ success: true });
++    }
++
++    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/api/user-statistics/route.ts b/src/app/api/user-statistics/route.ts
+new file mode 100644
+index 0000000..4ae0419
+--- /dev/null
++++ b/src/app/api/user-statistics/route.ts
+@@ -0,0 +1,62 @@
++import { NextRequest, NextResponse } from 'next/server';
++import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
++
++export async function GET(request: NextRequest) {
++  const authResult = await verifyUserToken(request);
++  if (!authResult.ok) {
++    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
++  }
++
++  try {
++    const supabaseAdmin = getSupabaseAdmin();
++    const { uid } = authResult;
++
++    // 1. Fetch Profile
++    const { data: profile } = await supabaseAdmin.from("profiles").select("xp, level, streak_count").eq("id", uid).single();
++
++    // 2. Fetch Recent Tests
++    const { data: testData } = await supabaseAdmin
++      .from("test_attempts")
++      .select("*")
++      .eq("user_id", uid)
++      .order("submitted_at", { ascending: false })
++      .limit(10);
++
++    // 3. Compute total practiced & accuracy
++    const attemptIds = (testData || []).map((a: Record<string, unknown>) => a.id);
++    let attemptAnswers: Record<string, unknown>[] = [];
++    if (attemptIds.length > 0) {
++      const { data: answersData } = await supabaseAdmin
++        .from("attempt_answers")
++        .select("is_correct, created_at")
++        .in("attempt_id", attemptIds);
++      if (answersData) attemptAnswers = answersData;
++    }
++
++    // 4. Fetch Weak Subjects
++    const { data: weakData } = await supabaseAdmin
++      .from("user_statistics")
++      .select("accuracy_percent, total_attempted, subject_id")
++      .eq("user_id", uid)
++      .gte("total_attempted", 2)
++      .order("accuracy_percent", { ascending: true })
++      .limit(5);
++
++    // 5. Fetch Badges
++    const { data: badgeData } = await supabaseAdmin
++      .from("achievements")
++      .select("badge_name, earned_at")
++      .eq("user_id", uid);
++
++    return NextResponse.json({
++        profile: profile || { xp: 0, level: 1, streak_count: 0 },
++        tests: testData || [],
++        answers: attemptAnswers || [],
++        weakTopics: weakData || [],
++        badges: badgeData || []
++    });
++
++  } catch (err: unknown) {
++    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
++  }
++}
+diff --git a/src/app/performance/page.tsx b/src/app/performance/page.tsx
+index fad3493..26f38f9 100644
+--- a/src/app/performance/page.tsx
++++ b/src/app/performance/page.tsx
+@@ -3,7 +3,7 @@
+ import { ProtectedRoute } from "@/components/protected-route";
+ import { useAuth } from "@/hooks/useAuth";
+ import { useEffect, useState } from "react";
+-import { supabase } from "@/lib/supabase";
++
+ import {
+   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+   ResponsiveContainer
+@@ -107,61 +107,45 @@ export default function PerformancePage() {
+ 
+     const load = async () => {
+       try {
+-        // 1. Fetch Profile
+-        const { data: pData } = await supabase.from("profiles").select("xp, level, streak_count").eq("id", uid).single();
+-        if (pData) setProfile(pData);
+-
+-        // 2. Fetch Recent Tests (order by submitted_at)
+-        const { data: testData, error: testError } = await supabase
+-          .from("test_attempts")
+-          .select("*")
+-          .eq("user_id", uid)
+-          .order("submitted_at", { ascending: false })
+-          .limit(10);
+-        console.log('Attempts fetched:', testData?.length, testError);
+-        if (testData) setAttempts(testData);
+-
+-        // 3. Compute total practiced & accuracy from attempt_answers
+-        const attemptIds = (testData || []).map((a: Record<string, unknown>) => a.id);
+-        let totalPracticedCount = 0;
+-        let totalCorrectCount = 0;
+-        const heatCounts: Record<string, number> = {};
+-        const ninetyDaysAgo = new Date();
+-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+-        const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
+-
+-        if (attemptIds.length > 0) {
+-          const { data: answersData } = await supabase
+-            .from("attempt_answers")
+-            .select("is_correct, created_at")
+-            .in("attempt_id", attemptIds);
+-
+-          if (answersData) {
+-            totalPracticedCount = answersData.length;
+-            totalCorrectCount = answersData.filter((a: Record<string, unknown>) => a.is_correct).length;
+-            answersData.forEach((row: Record<string, unknown>) => {
+-              if (row.created_at) {
+-                const d = (row.created_at as string).split("T")[0];
+-                if (d >= ninetyStr) heatCounts[d] = (heatCounts[d] || 0) + 1;
+-              }
+-            });
+-          }
+-        }
+-        setTotalPracticed(totalPracticedCount);
+-        setOverallAccuracy(totalPracticedCount > 0 ? Math.round((totalCorrectCount / totalPracticedCount) * 100) : 0);
+-        setHeatmapMap(heatCounts);
+-
+-        // 4. Fetch Weak Subjects from user_statistics
+-        const { data: weakData } = await supabase
+-          .from("user_statistics")
+-          .select("accuracy_percent, total_attempted, subject_id")
+-          .eq("user_id", uid)
+-          .gte("total_attempted", 2)
+-          .order("accuracy_percent", { ascending: true })
+-          .limit(5);
+-
+-        if (weakData) {
+-          setWeakTopics(weakData.map(w => ({
++        const token = await user.getIdToken();
++        const res = await fetch('/api/user-statistics', {
++          headers: { 'Authorization': `Bearer ${token}` }
++        });
++        
++        if (res.ok) {
++          const data = await res.json();
++          
++          // 1. Profile
++          setProfile(data.profile);
++          
++          // 2. Attempts
++          const testData = data.tests;
++          setAttempts(testData);
++          
++          // 3. Compute accuracy & heatmap
++          const answersData = data.answers;
++          const totalPracticedCount = answersData.length;
++          const totalCorrectCount = answersData.filter((a: Record<string, unknown>) => a.is_correct).length;
++          
++          const heatCounts: Record<string, number> = {};
++          const ninetyDaysAgo = new Date();
++          ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
++          const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
++          
++          answersData.forEach((row: Record<string, unknown>) => {
++            if (typeof row.created_at === 'string') {
++              const d = row.created_at.split("T")[0];
++              if (d >= ninetyStr) heatCounts[d] = (heatCounts[d] || 0) + 1;
++            }
++          });
++          
++          setTotalPracticed(totalPracticedCount);
++          setOverallAccuracy(totalPracticedCount > 0 ? Math.round((totalCorrectCount / totalPracticedCount) * 100) : 0);
++          setHeatmapMap(heatCounts);
++          
++          // 4. Weak Topics
++          const weakData = data.weakTopics;
++          setWeakTopics(weakData.map((w: Record<string, unknown>) => ({
+             topic_name: w.subject_id || "Unknown Subject",
+             topic_slug: "",
+             subject_name: w.subject_id || "Unknown Subject",
+@@ -169,20 +153,14 @@ export default function PerformancePage() {
+             accuracy: Number(w.accuracy_percent),
+             attempted: Number(w.total_attempted)
+           })));
+-        }
+-
+-        // 5. Fetch Badges
+-        const { data: badgeData } = await supabase
+-          .from("achievements")
+-          .select("badge_name, earned_at")
+-          .eq("user_id", uid);
+-
+-        if (badgeData) {
+-          const earnedMap = new Map(badgeData.map(b => [b.badge_name, b.earned_at]));
++          
++          // 5. Badges
++          const badgeData = data.badges;
++          const earnedMap = new Map<string, string | undefined>(badgeData.map((b: Record<string, unknown>) => [b.badge_name as string, b.earned_at as string | undefined]));
+           const mergedBadges = ALL_BADGES.map(b => ({
+             ...b,
+             earned: earnedMap.has(b.name),
+-            earnedAt: earnedMap.get(b.name)
++            earnedAt: earnedMap.get(b.name) as string | undefined
+           }));
+           setBadges(mergedBadges);
+         }
+diff --git a/src/app/practice-tests/page.tsx b/src/app/practice-tests/page.tsx
+index edd1f94..7086f94 100644
+--- a/src/app/practice-tests/page.tsx
++++ b/src/app/practice-tests/page.tsx
+@@ -112,21 +112,22 @@ export default function PracticeTestsPage() {
+       setSubjects(subjectsData);
+       setSelectedSubjects(subjectsData.map(s => s.name)); // Default select all
+ 
+-      // Fetch 2: questions count per subject
+-      const { data: questionCounts } = await supabase
+-        .from('questions')
+-        .select('subject_id, id');
+-
+-      // Fetch 3: user's attempt stats
++      // Fetch 2: questions and user attempts from secure API
++      let questionCounts: Record<string, unknown>[] = [];
+       let userAttempts: Record<string, unknown>[] = [];
++      
+       if (user) {
+-        const { data: userStats } = await supabase
+-          .from('question_attempts')
+-          .select('question_id, is_correct')
+-          .eq('user_id', user.uid);
+-        if (userStats) {
+-          userAttempts = userStats;
+-        }
++        try {
++          const token = await user.getIdToken();
++          const res = await fetch('/api/practice-tests/stats', {
++            headers: { 'Authorization': `Bearer ${token}` }
++          });
++          if (res.ok) {
++            const data = await res.json();
++            questionCounts = data.questions;
++            userAttempts = data.attempts;
++          }
++        } catch (_e) {}
+       }
+ 
+       // Build topic cards based on subjects
+diff --git a/src/app/profile/page.tsx b/src/app/profile/page.tsx
+index 47071cd..4cd92a6 100644
+--- a/src/app/profile/page.tsx
++++ b/src/app/profile/page.tsx
+@@ -3,7 +3,7 @@
+ import { ProtectedRoute } from "@/components/protected-route";
+ import { useAuth } from "@/hooks/useAuth";
+ import { useState, useEffect } from "react";
+-import { supabase } from "@/lib/supabase";
++
+ import {
+   User, Mail, Phone, Shield, Calendar, Edit2,
+   ChevronRight, ExternalLink, Clock, Bell, Zap
+@@ -48,21 +48,33 @@ export default function ProfilePage() {
+     if (field === "autosave_enabled") setAutosaveEnabled(value);
+     
+     setSavingField(field);
+-    await supabase.from("profiles").update({ [field]: value }).eq("id", user.uid);
++    try {
++      const token = await user.getIdToken();
++      await fetch('/api/profile', {
++        method: 'PUT',
++        headers: {
++          'Content-Type': 'application/json',
++          'Authorization': `Bearer ${token}`
++        },
++        body: JSON.stringify({ [field]: value })
++      });
++    } catch (_e) {}
+     setTimeout(() => setSavingField(null), 1000);
+   };
+ 
+   useEffect(() => {
+     const loadHistory = async () => {
+       if (!user?.uid) return;
+-      const { data, error } = await supabase
+-        .from("test_attempts")
+-        .select("*")
+-        .eq("user_id", user.uid)
+-        .order("submitted_at", { ascending: false })
+-        .limit(50);
+-      console.log('Test history:', data?.length, error);
+-      if (data && data.length > 0) setHistory(data);
++      try {
++        const token = await user.getIdToken();
++        const res = await fetch('/api/profile', {
++          headers: { 'Authorization': `Bearer ${token}` }
++        });
++        if (res.ok) {
++          const data = await res.json();
++          if (data.tests && data.tests.length > 0) setHistory(data.tests);
++        }
++      } catch (_e) {}
+     };
+     loadHistory();
+   }, [user?.uid]);
+@@ -70,8 +82,20 @@ export default function ProfilePage() {
+   const handleSaveAccount = async () => {
+     if (!user) return;
+     setSaving(true);
+-    await supabase.from("profiles").update({ name, phone }).eq("id", user.uid);
+-    setSaveMsg("Profile updated!");
++    try {
++      const token = await user.getIdToken();
++      await fetch('/api/profile', {
++        method: 'PUT',
++        headers: {
++          'Content-Type': 'application/json',
++          'Authorization': `Bearer ${token}`
++        },
++        body: JSON.stringify({ name, phone })
++      });
++      setSaveMsg("Profile updated!");
++    } catch (_e) {
++      setSaveMsg("Failed to update profile");
++    }
+     setSaving(false);
+     setEditMode(false);
+     setTimeout(() => setSaveMsg(""), 3000);
+diff --git a/src/app/results/page.tsx b/src/app/results/page.tsx
+index 6016d84..ece54c9 100644
+--- a/src/app/results/page.tsx
++++ b/src/app/results/page.tsx
+@@ -1,14 +1,17 @@
+ import { Suspense } from "react";
+ import ResultsInner from "./results-inner";
++import { ErrorBoundary } from "@/components/error-boundary";
+ 
+ export default function ResultsPage() {
+   return (
+-    <Suspense fallback={
+-      <div className="min-h-screen flex items-center justify-center bg-[#121212]">
+-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+-      </div>
+-    }>
+-      <ResultsInner />
+-    </Suspense>
++    <ErrorBoundary fallbackMessage="Could not load your test results. Please try again later.">
++      <Suspense fallback={
++        <div className="min-h-screen flex items-center justify-center bg-[#121212]">
++          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
++        </div>
++      }>
++        <ResultsInner />
++      </Suspense>
++    </ErrorBoundary>
+   );
+ }
+diff --git a/src/app/revision/page.tsx b/src/app/revision/page.tsx
+index 19773dc..2725f4b 100644
+--- a/src/app/revision/page.tsx
++++ b/src/app/revision/page.tsx
+@@ -1,8 +1,8 @@
+ "use client";
+ 
+ import { ProtectedRoute } from "@/components/protected-route";
+-import { useState, useEffect } from "react";
+-import { supabase } from "@/lib/supabase";
++import { useState, useEffect, useRef } from "react";
++
+ import { useAuth } from "@/hooks/useAuth";
+ import { CheckCircle2, XCircle, Activity, Calendar as CalIcon } from "lucide-react";
+ import Link from "next/link";
+@@ -51,59 +51,58 @@ export default function RevisionPage() {
+   const [longestInterval, setLongestInterval] = useState(0);
+   const [nextReviewDate, setNextReviewDate] = useState<number | null>(null);
+ 
++  const batchRef = useRef<Record<string, unknown>[]>([]);
++
++  // Flush batch on interval or unmount
++  useEffect(() => {
++    const flushBatch = async () => {
++      if (batchRef.current.length === 0 || !user) return;
++      const updates = [...batchRef.current];
++      batchRef.current = []; // clear immediately to prevent double send
++      
++      try {
++        const token = await user.getIdToken();
++        await fetch('/api/revision-queue', {
++          method: 'POST',
++          headers: {
++            'Content-Type': 'application/json',
++            'Authorization': `Bearer ${token}`
++          },
++          body: JSON.stringify({
++            action: 'batch_update_confidence',
++            updates
++          })
++        });
++      } catch (e) {
++        // on failure, we could push them back, but let's keep it simple for now
++        console.error("Batch update failed", e);
++      }
++    };
++
++    const interval = setInterval(flushBatch, 10000); // 10s
++    return () => {
++      clearInterval(interval);
++      flushBatch(); // flush on unmount
++    };
++  }, [user]);
++
+   // Load Data
+   useEffect(() => {
+     if (!user) return;
+ 
+     const loadData = async () => {
+-      const todayStr = new Date().toISOString().split("T")[0];
+-
+-      // 1. Fetch due questions
+-      const { data: qData } = await supabase
+-        .from("revision_queue")
+-        .select("*, questions(*)")
+-        .eq("user_id", user.uid)
+-        .lte("next_review_date", todayStr);
+-
+-      if (qData) {
+-        setQueue(qData as unknown as RevisionItem[]);
+-      }
+-
+-      // 2. Fetch future if empty
+-      if (!qData || qData.length === 0) {
+-        const { data: future } = await supabase
+-          .from("revision_queue")
+-          .select("next_review_date")
+-          .eq("user_id", user.uid)
+-          .gt("next_review_date", todayStr)
+-          .order("next_review_date", { ascending: true })
+-          .limit(1);
+-
+-        if (future && future.length > 0) {
+-          const futureDate = new Date(future[0].next_review_date);
+-          const diffTime = futureDate.getTime() - new Date().getTime();
+-          setNextReviewDate(Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+-        }
+-      }
+-
+-      // 3. Fetch heatmap data (last 90 days)
+-      const ninetyDaysAgo = new Date();
+-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+-      const ninetyStr = ninetyDaysAgo.toISOString().split("T")[0];
+-
+-      const { data: hData } = await supabase
+-        .from("question_attempts")
+-        .select("attempt_date")
+-        .eq("user_id", user.uid)
+-        .gte("attempt_date", ninetyStr);
+-
+-      if (hData) {
+-        const counts: Record<string, number> = {};
+-        hData.forEach(row => {
+-          counts[row.attempt_date] = (counts[row.attempt_date] || 0) + 1;
++      try {
++        const token = await user.getIdToken();
++        const res = await fetch('/api/revision-queue', {
++          headers: { 'Authorization': `Bearer ${token}` }
+         });
+-        setHeatmapMap(counts);
+-      }
++        if (res.ok) {
++          const data = await res.json();
++          setQueue(data.queue as RevisionItem[]);
++          setNextReviewDate(data.nextReviewDate);
++          setHeatmapMap(data.heatmapMap);
++        }
++      } catch (_e) {}
+ 
+       setLoading(false);
+     };
+@@ -152,31 +151,16 @@ export default function RevisionPage() {
+     nextReview.setDate(nextReview.getDate() + newInterval);
+     const nextReviewStr = nextReview.toISOString().split("T")[0];
+ 
+-    // Update Revision Queue
+-    await supabase.from("revision_queue").update({
++    // Add to batch instead of API call immediately
++    batchRef.current.push({
++      id: item.id,
+       interval_days: newInterval,
+       ease_factor: newEase,
+       repetitions: newRepetitions,
+       next_review_date: nextReviewStr,
+-      updated_at: new Date().toISOString()
+-    }).eq("id", item.id);
+-
+-    // Update Profile XP
+-    const { error: rpcError } = await supabase.rpc('increment_xp', { user_id: user.uid, xp_amount: earnedXp });
+-    if (rpcError) {
+-      // Fallback if RPC doesn't exist
+-      supabase.from("profiles").select("xp").eq("id", user.uid).single().then(({data}) => {
+-        if (data) supabase.from("profiles").update({ xp: data.xp + earnedXp }).eq("id", user.uid).then();
+-      });
+-    }
+-
+-    // Log Attempt
+-    const todayStr = new Date().toISOString().split("T")[0];
+-    await supabase.from("question_attempts").insert({
+-      user_id: user.uid,
+       question_id: item.question_id,
+       is_correct: isCorrect,
+-      attempt_date: todayStr
++      earnedXp
+     });
+ 
+     // Advance
+diff --git a/src/app/test-interface/interface.tsx b/src/app/test-interface/interface.tsx
+index f489a60..5c5cb64 100644
+--- a/src/app/test-interface/interface.tsx
++++ b/src/app/test-interface/interface.tsx
+@@ -78,13 +78,16 @@ export default function TestInterfaceInner() {
+   useEffect(() => {
+     if (user) {
+       const fetchBookmarks = async () => {
+-        const { data } = await supabase
+-          .from("bookmarks")
+-          .select("question_id")
+-          .eq("user_id", user.uid);
+-        if (data) {
+-          setBookmarkedQuestions(new Set(data.map(b => b.question_id)));
+-        }
++        try {
++          const token = await user.getIdToken();
++          const res = await fetch('/api/bookmarks', {
++            headers: { 'Authorization': `Bearer ${token}` }
++          });
++          if (res.ok) {
++            const data = await res.json();
++            setBookmarkedQuestions(new Set(data.bookmarks.map((b: Record<string, unknown>) => b.question_id)));
++          }
++        } catch (_e) {}
+       };
+       fetchBookmarks();
+     }
+@@ -95,30 +98,33 @@ export default function TestInterfaceInner() {
+     const loadQuestions = async () => {
+       try {
+         let data: Question[] | null = null;
+-        let query = supabase.from("questions").select("*");
++        
++        const token = await user?.getIdToken();
++        const res = await fetch('/api/questions', {
++          method: 'POST',
++          headers: {
++            'Content-Type': 'application/json',
++            ...(token ? { Authorization: `Bearer ${token}` } : {})
++          },
++          body: JSON.stringify({ mode, subject, topic, difficulty, testId, customCount })
++        });
++        
++        if (res.ok) {
++          const resData = await res.json();
++          data = resData.questions;
++        }
+ 
+         if (mode === "practice" || mode === "test") {
+-          if (subject) query = query.eq("subject", subject);
+-          if (topic) query = query.eq("topic", topic);
+-          if (difficulty && difficulty !== "All Levels") query = query.eq("difficulty", difficulty);
+-          query = query.limit(customCount);
+           setTestName(topic ? `${topic} Practice` : `${subject} Practice`);
+           setTimeLeft(3600);
+         } else if (mode === "mock" && testId) {
+-          query = query.limit(100);
+           setTestName(`Mock Test #${testId}`);
+           setTimeLeft(7200);
+         } else if (mode === "custom") {
+-          query = query.limit(customCount);
+           setTestName("Custom Test");
+           setTimeLeft(customTime);
+         }
+ 
+-        const { data: fetchedData, error } = await query;
+-        if (!error && fetchedData && fetchedData.length > 0) {
+-          data = fetchedData;
+-        }
+-
+         const finalQuestions = data || [];
+         setQuestions(finalQuestions);
+         // Record start time once questions are loaded
+@@ -379,18 +385,37 @@ export default function TestInterfaceInner() {
+ 
+   const handleBookmarkToggle = async () => {
+     if (!currentQ || !user) return;
+-    
+     const isBookmarked = bookmarkedQuestions.has(currentQ.id);
+-    const newSet = new Set(bookmarkedQuestions);
+-    
+-    if (isBookmarked) {
+-      newSet.delete(currentQ.id);
+-      setBookmarkedQuestions(newSet);
+-      await supabase.from("bookmarks").delete().match({ user_id: user.uid, question_id: currentQ.id });
+-    } else {
+-      newSet.add(currentQ.id);
+-      setBookmarkedQuestions(newSet);
+-      await supabase.from("bookmarks").insert({ user_id: user.uid, question_id: currentQ.id, folder_name: 'General' });
++
++    // Optimistic UI update
++    setBookmarkedQuestions(prev => {
++      const next = new Set(prev);
++      if (isBookmarked) next.delete(currentQ.id);
++      else next.add(currentQ.id);
++      return next;
++    });
++
++    try {
++      const token = await user.getIdToken();
++      await fetch('/api/bookmarks', {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          'Authorization': `Bearer ${token}`
++        },
++        body: JSON.stringify({ 
++          question_id: currentQ.id, 
++          action: isBookmarked ? 'remove' : 'add' 
++        })
++      });
++    } catch (_e) {
++      // Revert on error
++      setBookmarkedQuestions(prev => {
++        const next = new Set(prev);
++        if (isBookmarked) next.add(currentQ.id);
++        else next.delete(currentQ.id);
++        return next;
++      });
+     }
+   };
+ 
+diff --git a/src/components/admin/dashboard-tab.tsx b/src/components/admin/dashboard-tab.tsx
+index d8ce9a6..3ebd554 100644
+--- a/src/components/admin/dashboard-tab.tsx
++++ b/src/components/admin/dashboard-tab.tsx
+@@ -28,7 +28,7 @@ export function DashboardTab() {
+     });
+     if (!res.ok) {
+       const err = new Error("Failed to fetch dashboard");
+-      (err as any).status = res.status;
++      (err as Error & { status?: number }).status = res.status;
+       throw err;
+     }
+     const data = await res.json();
+@@ -44,7 +44,8 @@ export function DashboardTab() {
+     { 
+       refreshInterval: shouldPoll ? 10000 : 0,
+       onError: (err) => {
+-        if ((err as any).status === 401 || (err as any).status === 403) {
++        const errorWithStatus = err as Error & { status?: number };
++        if (errorWithStatus.status === 401 || errorWithStatus.status === 403) {
+           setFailures(prev => prev + 1);
+         }
+       },
+diff --git a/src/components/admin/manage-tab.tsx b/src/components/admin/manage-tab.tsx
+index c6bc825..6bb66f5 100644
+--- a/src/components/admin/manage-tab.tsx
++++ b/src/components/admin/manage-tab.tsx
+@@ -26,7 +26,7 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) =>
+     });
+     if (!res.ok) {
+       const err = new Error("Failed to fetch data");
+-      (err as any).status = res.status;
++      (err as Error & { status?: number }).status = res.status;
+       throw err;
+     }
+     return res.json();
+diff --git a/src/components/admin/question-form.tsx b/src/components/admin/question-form.tsx
+index de7aa00..4d0322e 100644
+--- a/src/components/admin/question-form.tsx
++++ b/src/components/admin/question-form.tsx
+@@ -43,12 +43,11 @@ interface QuestionFormProps {
+   initialData?: QuestionFormValues;
+   subjects: Record<string, unknown>[];
+   topics: Record<string, unknown>[];
+-  userId: string;
+   onSuccess: () => void;
+   onCancel: () => void;
+ }
+ 
+-export function QuestionForm({ initialData, subjects, topics, userId, onSuccess, onCancel }: QuestionFormProps) {
++export function QuestionForm({ initialData, subjects, topics, onSuccess, onCancel }: QuestionFormProps) {
+   const { user } = useAuth();
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [errorMsg, setErrorMsg] = useState("");
+diff --git a/src/components/error-boundary.tsx b/src/components/error-boundary.tsx
+new file mode 100644
+index 0000000..4ebd9ac
+--- /dev/null
++++ b/src/components/error-boundary.tsx
+@@ -0,0 +1,54 @@
++"use client";
++
++import React, { Component, ErrorInfo, ReactNode } from "react";
++import { AlertTriangle, RefreshCcw } from "lucide-react";
++
++interface Props {
++  children?: ReactNode;
++  fallbackMessage?: string;
++}
++
++interface State {
++  hasError: boolean;
++  errorMsg: string;
++}
++
++export class ErrorBoundary extends Component<Props, State> {
++  public state: State = {
++    hasError: false,
++    errorMsg: ""
++  };
++
++  public static getDerivedStateFromError(error: Error): State {
++    return { hasError: true, errorMsg: error.message };
++  }
++
++  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
++    console.error("Uncaught error:", error, errorInfo);
++  }
++
++  public render() {
++    if (this.state.hasError) {
++      return (
++        <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
++          <div className="bg-red-500/10 p-4 rounded-full mb-4">
++            <AlertTriangle className="w-10 h-10 text-red-500" />
++          </div>
++          <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
++          <p className="text-white/70 max-w-md mb-6">
++            {this.props.fallbackMessage || this.state.errorMsg || "An unexpected error occurred while loading this page."}
++          </p>
++          <button 
++            onClick={() => window.location.reload()}
++            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors"
++          >
++            <RefreshCcw className="w-4 h-4" />
++            Reload Page
++          </button>
++        </div>
++      );
++    }
++
++    return this.props.children;
++  }
++}
+diff --git a/src/hooks/useAuth.tsx b/src/hooks/useAuth.tsx
+index e35bfc0..7a15a8b 100644
+--- a/src/hooks/useAuth.tsx
++++ b/src/hooks/useAuth.tsx
+@@ -11,7 +11,6 @@ import {
+   User as FirebaseUser,
+ } from "firebase/auth";
+ import { auth } from "@/lib/firebase";
+-import { supabase } from "@/lib/supabase";
+ 
+ interface UserProfile {
+   id: string;
+@@ -41,34 +40,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+   const [profile, setProfile] = useState<UserProfile | null>(null);
+   const [loading, setLoading] = useState(true);
+ 
+-  // Sync with Supabase profiles table
++  // Sync with Supabase profiles table via secure API
+   const syncProfile = async (firebaseUser: FirebaseUser, name?: string) => {
+     try {
+-      // Check if profile exists
+-      const { data, error } = await supabase
+-        .from("profiles")
+-        .select("*")
+-        .eq("id", firebaseUser.uid)
+-        .single();
+-
+-      if (error && error.code !== "PGRST116") { // not found
+-        console.error("Error fetching profile:", error);
+-      }
+-
+-      if (!data) {
+-        // Create new profile
+-        const displayName = name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User';
+-        const newProfile = {
+-          id: firebaseUser.uid,
+-          name: displayName,
+-          email: firebaseUser.email,
+-          plan: "free",
+-        };
+-        const { error: insertError } = await supabase.from("profiles").insert(newProfile);
+-        if (insertError) console.error("Error creating profile:", insertError);
+-        setProfile(newProfile as UserProfile);
++      const token = await firebaseUser.getIdToken();
++      const res = await fetch('/api/auth/sync-profile', {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          'Authorization': `Bearer ${token}`
++        },
++        body: JSON.stringify({ 
++          name: name || firebaseUser.displayName, 
++          email: firebaseUser.email 
++        })
++      });
++      
++      if (res.ok) {
++        const data = await res.json();
++        setProfile(data.profile);
+       } else {
+-        setProfile(data as UserProfile);
++        console.error("Error syncing profile:", await res.text());
+       }
+     } catch (err) {
+       console.error("Profile sync error:", err);
+diff --git a/src/lib/ai/gemini.ts b/src/lib/ai/gemini.ts
+index 7e2a266..4b59e6e 100644
+--- a/src/lib/ai/gemini.ts
++++ b/src/lib/ai/gemini.ts
+@@ -46,7 +46,8 @@ export async function callGemini(payload: GenerateRequestPayload): Promise<Gener
+   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured on the server.");
+ 
+   const prompt = buildPrompt(payload.text, payload.config);
+-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
++  const modelName = process.env.GEMINI_MODEL;
++  if (!modelName) throw new Error("GEMINI_MODEL is not configured on the server.");
+   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+ 
+   let retries = 0;
+diff --git a/src/lib/chunk-processor.ts b/src/lib/chunk-processor.ts
+index eb12c18..2f1fa2b 100644
+--- a/src/lib/chunk-processor.ts
++++ b/src/lib/chunk-processor.ts
+@@ -142,7 +142,8 @@ async function callGeminiWithRetry(prompt: string, onStatus: (msg: string) => vo
+       const controller = new AbortController();
+       const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+ 
+-      const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
++      const modelName = process.env.GEMINI_MODEL;
++      if (!modelName) throw new Error("GEMINI_MODEL is not configured on the server.");
+       const response = await fetch(
+         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+         {
+diff --git a/src/lib/current-affairs/sources.ts b/src/lib/current-affairs/sources.ts
+new file mode 100644
+index 0000000..9f17aa0
+--- /dev/null
++++ b/src/lib/current-affairs/sources.ts
+@@ -0,0 +1,39 @@
++export interface RSSSource {
++  id: string;
++  name: string;
++  url: string;
++  defaultSubject: string;
++}
++
++export const CURRENT_AFFAIRS_SOURCES: RSSSource[] = [
++  {
++    id: 'the-hindu',
++    name: 'The Hindu',
++    url: 'https://www.thehindu.com/feeder/default.rss',
++    defaultSubject: 'Current Affairs'
++  },
++  {
++    id: 'indian-express',
++    name: 'The Indian Express',
++    url: 'https://indianexpress.com/feed/',
++    defaultSubject: 'Current Affairs'
++  },
++  {
++    id: 'pib',
++    name: 'Press Information Bureau (PIB)',
++    url: 'https://pib.gov.in/feeder/default.rss', // Using placeholder structure if PIB doesn't have standard feed
++    defaultSubject: 'Government Schemes & Policies'
++  },
++  {
++    id: 'prs-india',
++    name: 'PRS Legislative Research',
++    url: 'https://prsindia.org/feed', // Placeholder structure
++    defaultSubject: 'Polity & Governance'
++  },
++  {
++    id: 'yojana',
++    name: 'Yojana Magazine',
++    url: 'https://yojana.gov.in/feed', // Placeholder structure
++    defaultSubject: 'Economy & Development'
++  }
++];
+diff --git a/src/lib/db/migrations.sql b/src/lib/db/migrations.sql
+deleted file mode 100644
+index a743ff4..0000000
+--- a/src/lib/db/migrations.sql
++++ /dev/null
+@@ -1,141 +0,0 @@
+--- STEP 1: ALTER existing tables to add missing columns
+-
+--- Add differentiator columns to questions table
+-ALTER TABLE questions 
+-  ADD COLUMN IF NOT EXISTS why_a_wrong TEXT,
+-  ADD COLUMN IF NOT EXISTS why_b_wrong TEXT,
+-  ADD COLUMN IF NOT EXISTS why_c_wrong TEXT,
+-  ADD COLUMN IF NOT EXISTS why_d_wrong TEXT,
+-  ADD COLUMN IF NOT EXISTS elimination_tip TEXT,
+-  ADD COLUMN IF NOT EXISTS memory_trick TEXT,
+-  ADD COLUMN IF NOT EXISTS static_topic_link TEXT,
+-  ADD COLUMN IF NOT EXISTS related_current_affairs TEXT,
+-  ADD COLUMN IF NOT EXISTS estimated_solving_time INTEGER,
+-  ADD COLUMN IF NOT EXISTS revision_priority TEXT DEFAULT 'normal',
+-  ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'original',
+-  ADD COLUMN IF NOT EXISTS year INTEGER,
+-  ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}',
+-  ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'en',
+-  ADD COLUMN IF NOT EXISTS created_by TEXT,
+-  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+-
+--- Add gamification + streak columns to profiles
+-ALTER TABLE profiles
+-  ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0,
+-  ADD COLUMN IF NOT EXISTS level INTEGER DEFAULT 1,
+-  ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 0,
+-  ADD COLUMN IF NOT EXISTS streak_count INTEGER DEFAULT 0,
+-  ADD COLUMN IF NOT EXISTS last_active DATE,
+-  ADD COLUMN IF NOT EXISTS notifications_enabled BOOLEAN DEFAULT true,
+-  ADD COLUMN IF NOT EXISTS autosave_enabled BOOLEAN DEFAULT true,
+-  ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'student';
+-
+--- Add topic_id to user_statistics if it already exists
+-ALTER TABLE user_statistics
+-  ADD COLUMN IF NOT EXISTS topic_id UUID REFERENCES topics(id) ON DELETE CASCADE;
+-
+-
+-
+--- STEP 2: CREATE new tables
+-
+-CREATE TABLE IF NOT EXISTS subjects (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  name TEXT NOT NULL,
+-  slug TEXT UNIQUE,
+-  icon TEXT,
+-  color TEXT,
+-  created_at TIMESTAMP DEFAULT NOW()
+-);
+-
+-CREATE TABLE IF NOT EXISTS topics (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
+-  name TEXT NOT NULL,
+-  slug TEXT,
+-  created_at TIMESTAMP DEFAULT NOW()
+-);
+-
+-CREATE TABLE IF NOT EXISTS bookmarks (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  user_id TEXT NOT NULL,
+-  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+-  folder_name TEXT DEFAULT 'General',
+-  notes TEXT,
+-  created_at TIMESTAMP DEFAULT NOW(),
+-  UNIQUE(user_id, question_id)
+-);
+-
+-CREATE TABLE IF NOT EXISTS revision_queue (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  user_id TEXT NOT NULL,
+-  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+-  next_review_date DATE NOT NULL DEFAULT CURRENT_DATE + 1,
+-  interval_days INTEGER DEFAULT 1,
+-  ease_factor NUMERIC DEFAULT 2.5,
+-  repetitions INTEGER DEFAULT 0,
+-  created_at TIMESTAMP DEFAULT NOW(),
+-  updated_at TIMESTAMP DEFAULT NOW(),
+-  UNIQUE(user_id, question_id)
+-);
+-
+-CREATE TABLE IF NOT EXISTS user_statistics (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  user_id TEXT NOT NULL,
+-  subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
+-  topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+-  total_attempted INTEGER DEFAULT 0,
+-  total_correct INTEGER DEFAULT 0,
+-  accuracy_percent NUMERIC DEFAULT 0,
+-  avg_time_seconds NUMERIC DEFAULT 0,
+-  updated_at TIMESTAMP DEFAULT NOW()
+-);
+-
+--- Note: We use conditional unique indices instead of a UNIQUE constraint 
+--- so we can track both subject-level (topic_id IS NULL) and topic-level stats independently.
+-CREATE UNIQUE INDEX IF NOT EXISTS user_stat_unique_topic 
+-  ON user_statistics (user_id, subject_id, topic_id) 
+-  WHERE topic_id IS NOT NULL;
+-  
+-CREATE UNIQUE INDEX IF NOT EXISTS user_stat_unique_subject 
+-  ON user_statistics (user_id, subject_id) 
+-  WHERE topic_id IS NULL;
+-
+-CREATE TABLE IF NOT EXISTS achievements (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  user_id TEXT NOT NULL,
+-  badge_name TEXT NOT NULL,
+-  badge_type TEXT,
+-  earned_at TIMESTAMP DEFAULT NOW(),
+-  UNIQUE(user_id, badge_name)
+-);
+-
+-CREATE TABLE IF NOT EXISTS daily_current_affairs (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  title TEXT,
+-  source_url TEXT,
+-  source_text TEXT,
+-  article_date DATE DEFAULT CURRENT_DATE,
+-  subject_id UUID REFERENCES subjects(id),
+-  created_at TIMESTAMP DEFAULT NOW()
+-);
+-
+-
+--- STEP 3: Seed subjects
+-INSERT INTO subjects (name, slug, icon, color) VALUES
+-('Polity', 'polity', 'ΓÜû∩╕Å', '#6366f1'),
+-('History', 'history', '≡ƒô£', '#f59e0b'),
+-('Geography', 'geography', '≡ƒîì', '#10b981'),
+-('Economy', 'economy', '≡ƒôê', '#3b82f6'),
+-('Environment', 'environment', '≡ƒî┐', '#22c55e'),
+-('Science & Tech', 'science-tech', '≡ƒö¼', '#8b5cf6'),
+-('Current Affairs', 'current-affairs', '≡ƒô░', '#ef4444')
+-ON CONFLICT (slug) DO NOTHING;
+-
+-CREATE TABLE IF NOT EXISTS question_attempts (
+-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-  user_id TEXT NOT NULL,
+-  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+-  is_correct BOOLEAN,
+-  attempt_date DATE DEFAULT CURRENT_DATE,
+-  created_at TIMESTAMP DEFAULT NOW()
+-);

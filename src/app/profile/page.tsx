@@ -3,7 +3,7 @@
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+
 import {
   User, Mail, Phone, Shield, Calendar, Edit2,
   ChevronRight, ExternalLink, Clock, Bell, Zap
@@ -48,21 +48,33 @@ export default function ProfilePage() {
     if (field === "autosave_enabled") setAutosaveEnabled(value);
     
     setSavingField(field);
-    await supabase.from("profiles").update({ [field]: value }).eq("id", user.uid);
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ [field]: value })
+      });
+    } catch (_e) {}
     setTimeout(() => setSavingField(null), 1000);
   };
 
   useEffect(() => {
     const loadHistory = async () => {
       if (!user?.uid) return;
-      const { data, error } = await supabase
-        .from("test_attempts")
-        .select("*")
-        .eq("user_id", user.uid)
-        .order("submitted_at", { ascending: false })
-        .limit(50);
-      console.log('Test history:', data?.length, error);
-      if (data && data.length > 0) setHistory(data);
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/profile', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tests && data.tests.length > 0) setHistory(data.tests);
+        }
+      } catch (_e) {}
     };
     loadHistory();
   }, [user?.uid]);
@@ -70,8 +82,20 @@ export default function ProfilePage() {
   const handleSaveAccount = async () => {
     if (!user) return;
     setSaving(true);
-    await supabase.from("profiles").update({ name, phone }).eq("id", user.uid);
-    setSaveMsg("Profile updated!");
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name, phone })
+      });
+      setSaveMsg("Profile updated!");
+    } catch (_e) {
+      setSaveMsg("Failed to update profile");
+    }
     setSaving(false);
     setEditMode(false);
     setTimeout(() => setSaveMsg(""), 3000);

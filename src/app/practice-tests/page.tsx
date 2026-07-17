@@ -112,21 +112,22 @@ export default function PracticeTestsPage() {
       setSubjects(subjectsData);
       setSelectedSubjects(subjectsData.map(s => s.name)); // Default select all
 
-      // Fetch 2: questions count per subject
-      const { data: questionCounts } = await supabase
-        .from('questions')
-        .select('subject_id, id');
-
-      // Fetch 3: user's attempt stats
+      // Fetch 2: questions and user attempts from secure API
+      let questionCounts: Record<string, unknown>[] = [];
       let userAttempts: Record<string, unknown>[] = [];
+      
       if (user) {
-        const { data: userStats } = await supabase
-          .from('question_attempts')
-          .select('question_id, is_correct')
-          .eq('user_id', user.uid);
-        if (userStats) {
-          userAttempts = userStats;
-        }
+        try {
+          const token = await user.getIdToken();
+          const res = await fetch('/api/practice-tests/stats', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            questionCounts = data.questions;
+            userAttempts = data.attempts;
+          }
+        } catch (_e) {}
       }
 
       // Build topic cards based on subjects

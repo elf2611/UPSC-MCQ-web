@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       answers: answersData || []
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in get-result route:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

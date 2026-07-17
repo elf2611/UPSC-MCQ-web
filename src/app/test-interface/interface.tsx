@@ -78,13 +78,16 @@ export default function TestInterfaceInner() {
   useEffect(() => {
     if (user) {
       const fetchBookmarks = async () => {
-        const { data } = await supabase
-          .from("bookmarks")
-          .select("question_id")
-          .eq("user_id", user.uid);
-        if (data) {
-          setBookmarkedQuestions(new Set(data.map(b => b.question_id)));
-        }
+        try {
+          const token = await user.getIdToken();
+          const res = await fetch('/api/bookmarks', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setBookmarkedQuestions(new Set(data.bookmarks.map((b: Record<string, unknown>) => b.question_id)));
+          }
+        } catch (_e) {}
       };
       fetchBookmarks();
     }
@@ -95,28 +98,31 @@ export default function TestInterfaceInner() {
     const loadQuestions = async () => {
       try {
         let data: Question[] | null = null;
-        let query = supabase.from("questions").select("*");
+        
+        const token = await user?.getIdToken();
+        const res = await fetch('/api/questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ mode, subject, topic, difficulty, testId, customCount })
+        });
+        
+        if (res.ok) {
+          const resData = await res.json();
+          data = resData.questions;
+        }
 
         if (mode === "practice" || mode === "test") {
-          if (subject) query = query.eq("subject", subject);
-          if (topic) query = query.eq("topic", topic);
-          if (difficulty && difficulty !== "All Levels") query = query.eq("difficulty", difficulty);
-          query = query.limit(customCount);
           setTestName(topic ? `${topic} Practice` : `${subject} Practice`);
           setTimeLeft(3600);
         } else if (mode === "mock" && testId) {
-          query = query.limit(100);
           setTestName(`Mock Test #${testId}`);
           setTimeLeft(7200);
         } else if (mode === "custom") {
-          query = query.limit(customCount);
           setTestName("Custom Test");
           setTimeLeft(customTime);
-        }
-
-        const { data: fetchedData, error } = await query;
-        if (!error && fetchedData && fetchedData.length > 0) {
-          data = fetchedData;
         }
 
         const finalQuestions = data || [];
@@ -379,18 +385,37 @@ export default function TestInterfaceInner() {
 
   const handleBookmarkToggle = async () => {
     if (!currentQ || !user) return;
-    
     const isBookmarked = bookmarkedQuestions.has(currentQ.id);
-    const newSet = new Set(bookmarkedQuestions);
-    
-    if (isBookmarked) {
-      newSet.delete(currentQ.id);
-      setBookmarkedQuestions(newSet);
-      await supabase.from("bookmarks").delete().match({ user_id: user.uid, question_id: currentQ.id });
-    } else {
-      newSet.add(currentQ.id);
-      setBookmarkedQuestions(newSet);
-      await supabase.from("bookmarks").insert({ user_id: user.uid, question_id: currentQ.id, folder_name: 'General' });
+
+    // Optimistic UI update
+    setBookmarkedQuestions(prev => {
+      const next = new Set(prev);
+      if (isBookmarked) next.delete(currentQ.id);
+      else next.add(currentQ.id);
+      return next;
+    });
+
+    try {
+      const token = await user.getIdToken();
+      await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          question_id: currentQ.id, 
+          action: isBookmarked ? 'remove' : 'add' 
+        })
+      });
+    } catch (_e) {
+      // Revert on error
+      setBookmarkedQuestions(prev => {
+        const next = new Set(prev);
+        if (isBookmarked) next.add(currentQ.id);
+        else next.delete(currentQ.id);
+        return next;
+      });
     }
   };
 

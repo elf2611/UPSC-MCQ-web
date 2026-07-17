@@ -43,12 +43,11 @@ interface QuestionFormProps {
   initialData?: QuestionFormValues;
   subjects: Record<string, unknown>[];
   topics: Record<string, unknown>[];
-  userId: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function QuestionForm({ initialData, subjects, topics, userId, onSuccess, onCancel }: QuestionFormProps) {
+export function QuestionForm({ initialData, subjects, topics, onSuccess, onCancel }: QuestionFormProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
