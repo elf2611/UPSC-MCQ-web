@@ -5,7 +5,6 @@ import { useForm, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Save, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
 export const questionSchema = z.object({
@@ -88,9 +87,18 @@ export function QuestionForm({ initialData, subjects, topics, onSuccess, onCance
         const result = await res.json();
         if (!res.ok) throw new Error(result.error || "Failed to update question");
       } else {
-        // Add mode (insert directly)
-        const { error } = await supabase.from('questions').insert([payload]);
-        if (error) throw error;
+        // Add mode (insert directly via API)
+        const token = await user?.getIdToken();
+        const res = await fetch('/api/admin/questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Failed to add question");
       }
       
       onSuccess();

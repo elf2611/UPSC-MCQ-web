@@ -4,10 +4,13 @@ import {
   XCircle, Link as LinkIcon, RefreshCw, Flame, BarChart2, Target
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/auth-verify";
 
 export default async function Home() {
+  const supabaseAdmin = getSupabaseAdmin();
+  
   // Fetch dynamic stats
-  const { count: mcqCount } = await supabase.from("questions").select("*", { count: "exact", head: true });
+  const { count: mcqCount } = await supabaseAdmin.from("questions").select("*", { count: "exact", head: true });
   const { count: mockCount } = await supabase.from("tests").select("*", { count: "exact", head: true }).eq("type", "full");
   const { count: userCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
   

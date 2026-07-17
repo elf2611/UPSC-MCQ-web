@@ -80,7 +80,19 @@ function AdminInner() {
   const handleAddSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     const slug = newSubName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    await supabase.from("subjects").insert({ name: newSubName, slug, color: newSubColor, icon: newSubIcon });
+    
+    const token = await user?.getIdToken();
+    const res = await fetch('/api/admin/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ name: newSubName, slug, color: newSubColor, icon: newSubIcon })
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      alert("Failed to add subject: " + (errorData.error || res.statusText));
+      return;
+    }
+    
     setNewSubName("");
     fetchSubjects();
   };
@@ -88,14 +100,35 @@ function AdminInner() {
   const handleAddTopic = async (subId: string) => {
     if(!newTopicName.trim()) return;
     const slug = newTopicName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    await supabase.from("topics").insert({ name: newTopicName, slug, subject_id: subId });
+    
+    const token = await user?.getIdToken();
+    const res = await fetch('/api/admin/topics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ name: newTopicName, slug, subject_id: subId })
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      alert("Failed to add topic: " + (errorData.error || res.statusText));
+      return;
+    }
+    
     setNewTopicName("");
     setAddingTopicTo(null);
     fetchSubjects();
   };
 
   const handleDeleteTopic = async (id: string) => {
-    await supabase.from("topics").delete().eq("id", id);
+    const token = await user?.getIdToken();
+    const res = await fetch(`/api/admin/topics?id=${id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      alert("Failed to delete topic: " + (errorData.error || res.statusText));
+      return;
+    }
     fetchSubjects();
   };
 

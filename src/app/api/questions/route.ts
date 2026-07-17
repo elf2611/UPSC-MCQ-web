@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     const { mode, subject, topic, difficulty, testId, customCount } = await request.json();
     const supabaseAdmin = getSupabaseAdmin();
-    let query = supabaseAdmin.from("questions").select("*");
+    let query = supabaseAdmin.from("questions").select("id, subject_id, subject, topic, question_text, option_a, option_b, option_c, option_d, difficulty");
 
     if (mode === "practice" || mode === "test") {
       if (subject) {

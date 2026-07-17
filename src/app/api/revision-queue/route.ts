@@ -110,6 +110,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
     }
 
+    if (action === 'upsert') {
+        // use destructured variables from line 78
+        await supabaseAdmin.from("revision_queue").upsert({
+            user_id: uid,
+            question_id,
+            interval_days,
+            next_review_date,
+            updated_at: new Date().toISOString()
+        }, { onConflict: "user_id, question_id" });
+        return NextResponse.json({ success: true });
+    }
+
     if (action === 'batch_update_confidence') {
         const { updates } = await request.json();
         const todayStr = new Date().toISOString().split("T")[0];

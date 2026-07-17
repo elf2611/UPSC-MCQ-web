@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
-import { Bookmark, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { Bookmark, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
 // --- Types ---
 type QuestionStatus = "not-visited" | "unanswered" | "answered" | "marked-for-review" | "answered-and-marked";
@@ -71,6 +71,7 @@ export default function TestInterfaceInner() {
   // New states for the additions
   const [feedbackMode, setFeedbackMode] = useState(false);
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Set<string>>(new Set());
+  const [isVerifying, setIsVerifying] = useState(false);
   const [toastMessage, setToastMessage] = useState<{message: string, isLevelUp: boolean} | null>(null);
   const startTimeRef = useRef<number>(0);
 
@@ -339,9 +340,38 @@ export default function TestInterfaceInner() {
 
   const currentQ = questions[currentIndex];
 
-  const handleSelectOption = (option: string) => {
-    if (!currentQ || feedbackMode) return;
-    setAnswers(prev => ({ ...prev, [currentQ.id]: option.toLowerCase().trim() }));
+  const handleSelectOption = async (option: string) => {
+    if (!currentQ || feedbackMode || isVerifying) return;
+    
+    const selectedLower = option.toLowerCase().trim();
+    setAnswers(prev => ({ ...prev, [currentQ.id]: selectedLower }));
+    
+    if (mode === 'practice') {
+      setIsVerifying(true);
+      try {
+        const token = await user?.getIdToken();
+        const res = await fetch('/api/questions/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ question_id: currentQ.id, selected_option: selectedLower })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setQuestions(prev => prev.map(q => q.id === currentQ.id ? { ...q, ...data } : q));
+        } else {
+          console.error("Verification failed");
+        }
+      } catch (err) {
+        console.error("Failed to verify question", err);
+      } finally {
+        setIsVerifying(false);
+      }
+    }
+    
     setQuestionStatus(prev => {
       const cur = prev[currentQ.id];
       return { ...prev, [currentQ.id]: cur === "marked-for-review" ? "answered-and-marked" : "answered" };
@@ -432,12 +462,20 @@ export default function TestInterfaceInner() {
       nextReview.setDate(nextReview.getDate() + interval);
       const nextReviewStr = nextReview.toISOString().split("T")[0];
 
-      await supabase.from("revision_queue").upsert({
-        user_id: user.uid,
-        question_id: currentQ.id,
-        interval_days: interval,
-        next_review_date: nextReviewStr
-      }, { onConflict: "user_id, question_id" });
+      const token = await user?.getIdToken();
+      await fetch('/api/revision-queue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          action: 'upsert',
+          question_id: currentQ.id,
+          interval_days: interval,
+          next_review_date: nextReviewStr
+        })
+      });
     }
 
     if (currentIndex < questions.length - 1) {
@@ -527,16 +565,16 @@ export default function TestInterfaceInner() {
                   return (
                     <button
                       key={opt}
-                      disabled={feedbackMode}
+                      disabled={feedbackMode || isVerifying}
                       onClick={() => handleSelectOption(opt)}
-                      className={`w-full text-left p-4 rounded-xl border transition-all flex items-start gap-4 ${btnStyle}`}
+                      className={`w-full text-left p-4 rounded-xl border transition-all flex items-start gap-4 ${btnStyle} ${isVerifying ? 'opacity-70 cursor-wait' : ''}`}
                     >
                       <span className={`flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center font-bold text-sm transition-colors ${
                         showAsCorrect ? "bg-green-500 border-green-500 text-white" :
                         showAsWrong ? "bg-red-500 border-red-500 text-white" :
                         isSelected ? "bg-primary border-primary text-primary-foreground" : "border-white/20 text-gray-400"
                       }`}>
-                        {opt}
+                        {isVerifying && isSelected ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : opt}
                       </span>
                       <span className="mt-1 text-sm leading-relaxed">{text}</span>
                     </button>

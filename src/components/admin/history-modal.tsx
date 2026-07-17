@@ -15,15 +15,19 @@ export function HistoryModal({ questionId, onClose, onRestored }: { questionId: 
   useEffect(() => {
     const fetchHistory = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('question_history')
-        .select('*, profiles:edited_by(email)')
-        .eq('question_id', questionId)
-        .order('edited_at', { ascending: false });
-      
-      if (error) setError(error.message);
-      else setHistory(data || []);
-      setLoading(false);
+      try {
+        const token = await user?.getIdToken();
+        const res = await fetch(`/api/admin/question-history?questionId=${questionId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load history");
+        setHistory(data.history || []);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchHistory();

@@ -176,17 +176,17 @@ export default function MockTestsPage() {
   useEffect(() => {
     const fetchTests = async () => {
       setLoading(true);
-      const { data: tests } = await supabase.from("tests").select("*");
-      let userAttempts: Record<string, unknown>[] = [];
-      
-      if (user) {
-        const { data: attempts } = await supabase.from("test_attempts").select("*").eq("user_id", user.uid);
-        if (attempts) userAttempts = attempts;
-      }
-
-      if (tests) {
-        const mappedTests = tests.map(t => {
-          const attempt = userAttempts.find(a => a.test_id === t.id);
+      try {
+        const token = await user?.getIdToken();
+        const res = await fetch('/api/mock-tests', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (!res.ok) throw new Error("Failed to fetch tests");
+        
+        const { tests, attempts } = await res.json();
+        
+        const mappedTests = tests.map((t: any) => {
+          const attempt = attempts.find((a: any) => a.test_id === t.id);
           return {
             ...t,
             status: attempt ? "completed" : "not_attempted",
@@ -194,8 +194,10 @@ export default function MockTestsPage() {
           };
         });
 
-        setFullTests(mappedTests.filter(t => t.type === "full"));
-        setSectionalTests(mappedTests.filter(t => t.type === "sectional"));
+        setFullTests(mappedTests.filter((t: any) => t.type === "full"));
+        setSectionalTests(mappedTests.filter((t: any) => t.type === "sectional"));
+      } catch (e) {
+        console.error(e);
       }
       setLoading(false);
     };

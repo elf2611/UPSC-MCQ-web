@@ -202,19 +202,28 @@ export function PdfUploader({ onExtractionComplete, className, aiConfig }: PdfUp
 
         if (res.status === 200) {
           const data = await res.json();
-          if (data.message === 'No waiting jobs found.') {
+          
+          if (data.claimed === false && data.reason === 'no_waiting_jobs') {
             console.log("[Orchestrator] No more waiting jobs. Stopping loop.");
             isProcessingRef.current = false;
             break;
           }
-          console.log("[Orchestrator] Chunk processed successfully. Moving to next immediately.");
+          
+          if (data.claimed === false && data.reason === 'lost_race_to_another_caller') {
+            console.log("[Orchestrator] Job claimed by another worker. Retrying in 1s...");
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+          
+          if (data.claimed === true) {
+            console.log("[Orchestrator] Chunk processed. Moving to next immediately.");
+            if (uploadId) fetchJobs(uploadId);
+            continue;
+          }
+          
+          // Fallback just in case response shape changes unexpectedly
+          console.log("[Orchestrator] Unknown 200 response:", data);
           if (uploadId) fetchJobs(uploadId);
-          continue; 
-        }
-        
-        if (res.status === 202) {
-          console.log("[Orchestrator] Job claimed by another worker. Retrying in 1s...");
-          await new Promise(r => setTimeout(r, 1000));
           continue;
         }
 

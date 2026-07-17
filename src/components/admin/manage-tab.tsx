@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/hooks/useAuth";
 import { Search, Pencil, Trash2, ChevronLeft, ChevronRight, History, Download, Upload } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { HistoryModal } from "./history-modal";
 import { ImportModal } from "./import-modal";
 
@@ -55,8 +54,17 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this question?")) {
-      await supabase.from("questions").delete().eq("id", id);
-      mutate();
+      const token = await user?.getIdToken();
+      const res = await fetch(`/api/admin/questions?id=${id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        alert("Failed to delete question: " + (errorData.error || res.statusText));
+      } else {
+        mutate();
+      }
     }
   };
 
