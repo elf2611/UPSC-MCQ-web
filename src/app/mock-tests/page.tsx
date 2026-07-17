@@ -184,7 +184,7 @@ export default function MockTestsPage() {
         
         const { tests, attempts } = await res.json();
         
-        const mappedTests = tests.map((t: MockTest) => {
+        const mappedTests = tests.map((t: Test) => {
           const attempt = attempts.find((a: { test_id: string, score: number }) => a.test_id === t.id);
           return {
             ...t,
@@ -193,8 +193,8 @@ export default function MockTestsPage() {
           };
         });
 
-        setFullTests(mappedTests.filter((t: MockTest) => t.type === "full"));
-        setSectionalTests(mappedTests.filter((t: MockTest) => t.type === "sectional"));
+        setFullTests(mappedTests.filter((t: Test) => t.type === "full"));
+        setSectionalTests(mappedTests.filter((t: Test) => t.type === "sectional"));
       } catch (e) {
         console.error(e);
       }

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Rate Limit (strict for verify to prevent scraping)
     // Using a separate bucket for verify, e.g., max 30 per minute
-    const rateLimit = await checkRateLimit(`verify_${userId}`, 30, 60);
+    const rateLimit = await checkRateLimit(`verify_${userId}`);
     if (!rateLimit.success) {
       return NextResponse.json({ error: 'Too many requests. Slow down.' }, { status: 429 });
     }
