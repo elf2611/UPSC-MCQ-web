@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { History, Undo, X, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
 export function HistoryModal({ questionId, onClose, onRestored }: { questionId: string, onClose: () => void, onRestored: () => void }) {

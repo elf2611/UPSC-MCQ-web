@@ -4,7 +4,6 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect } from "react";
 import { Plus, Clock, AlertTriangle, CheckCircle2, CircleDot, Users, ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 // --- Types ---
@@ -185,8 +184,8 @@ export default function MockTestsPage() {
         
         const { tests, attempts } = await res.json();
         
-        const mappedTests = tests.map((t: any) => {
-          const attempt = attempts.find((a: any) => a.test_id === t.id);
+        const mappedTests = tests.map((t: MockTest) => {
+          const attempt = attempts.find((a: { test_id: string, score: number }) => a.test_id === t.id);
           return {
             ...t,
             status: attempt ? "completed" : "not_attempted",
@@ -194,8 +193,8 @@ export default function MockTestsPage() {
           };
         });
 
-        setFullTests(mappedTests.filter((t: any) => t.type === "full"));
-        setSectionalTests(mappedTests.filter((t: any) => t.type === "sectional"));
+        setFullTests(mappedTests.filter((t: MockTest) => t.type === "full"));
+        setSectionalTests(mappedTests.filter((t: MockTest) => t.type === "sectional"));
       } catch (e) {
         console.error(e);
       }
