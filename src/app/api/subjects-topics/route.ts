@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
 
     const [subjectsRes, topicsRes, subtopicsRes] = await Promise.all([
-      supabaseAdmin.from('subjects').select('id, name, slug, description').order('name'),
+      supabaseAdmin.from('subjects').select('id, name, slug').order('name'),
       supabaseAdmin.from('topics').select('id, name, slug, subject_id').order('name'),
       supabaseAdmin.from('subtopics').select('id, name, slug, topic_id').order('name'),
     ]);
