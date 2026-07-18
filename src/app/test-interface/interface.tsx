@@ -176,6 +176,10 @@ export default function TestInterfaceInner() {
       let correctCount = 0;
       let wrongCount = 0;
 
+      // Determine strict grading mode (exam vs practice) based on context
+      const isStrict = ['mock', 'test', 'pyq', 'exam'].includes(mode);
+      const submitMode = isStrict ? 'exam' : 'practice';
+
       questions.forEach(q => {
         const ans = answers[q.id];
         if (ans) {
@@ -185,7 +189,7 @@ export default function TestInterfaceInner() {
             score += 2;
             correctCount++;
           } else {
-            score -= 0.66;
+            score -= isStrict ? 0.66 : 0;
             wrongCount++;
           }
         }
@@ -246,7 +250,8 @@ export default function TestInterfaceInner() {
         body: JSON.stringify({
           userId: user.uid,
           testId: testId || null,
-          mode,
+          mode: submitMode,
+          source_section: mode,
           score,
           totalMarks,
           correctCount,

@@ -23,7 +23,8 @@ const answerRowSchema = z.object({
 const submitSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   testId: z.string().uuid().optional(),
-  mode: z.enum(['practice', 'test', 'mock', 'pyq', 'current-affairs', 'custom', 'exam']).default('practice'),
+  mode: z.enum(['practice', 'exam']).default('practice'),
+  source_section: z.string().optional(),
   startedAt: z.string().optional(),
   timeTakenSeconds: z.number().default(0),
   answerRows: z.array(answerRowSchema).default([]),
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, testId, mode, startedAt, timeTakenSeconds, answerRows } = parsed.data;
+    const { userId, testId, mode, source_section, startedAt, timeTakenSeconds, answerRows } = parsed.data;
 
     if (userId !== authResult.uid) {
       return NextResponse.json({ error: 'Unauthorized user mismatch' }, { status: 403 });
@@ -115,7 +116,9 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const score = (correctCount * 2) - (wrongCount * 0.66);
+    const score = mode === 'exam' 
+      ? (correctCount * 2) - (wrongCount * 0.66)
+      : (correctCount * 2); // No negative marking in practice mode
     const accuracyPercent = (correctCount + wrongCount) > 0 
       ? (correctCount / (correctCount + wrongCount)) * 100 
       : 0;
@@ -124,7 +127,7 @@ export async function POST(request: NextRequest) {
     const { data: attemptId, error: rpcError } = await supabaseAdmin.rpc('submit_test_attempt', {
       p_user_id: userId,
       p_test_id: testId || null,
-      p_mode: mode,
+      p_mode: source_section || mode,
       p_score: score,
       p_total_marks: totalMarks,
       p_correct_count: correctCount,

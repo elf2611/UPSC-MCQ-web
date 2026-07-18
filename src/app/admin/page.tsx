@@ -63,22 +63,23 @@ function AdminInner() {
   }, []);
 
   const fetchSubjectsAndTopics = async () => {
-    const { data: s } = await supabase.from("subjects").select("*").order("name");
-    const { data: t } = await supabase.from("topics").select("*").order("name");
-    const { data: st } = await supabase.from("subtopics").select("*").order("name");
-    if (s) setSubjects(s);
-    if (t) setTopics(t);
-    if (st) setSubtopics(st);
+    try {
+      const token = await user?.getIdToken();
+      const res = await fetch("/api/subjects-topics", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSubjects(data.subjects || []);
+        setTopics(data.topics || []);
+        setSubtopics(data.subtopics || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch taxonomy", e);
+    }
   };
 
-  const fetchSubjects = async () => {
-    const { data: s } = await supabase.from("subjects").select("*").order("name");
-    const { data: t } = await supabase.from("topics").select("*").order("name");
-    const { data: st } = await supabase.from("subtopics").select("*").order("name");
-    if (s) setSubjects(s);
-    if (t) setTopics(t);
-    if (st) setSubtopics(st);
-  };
+  const fetchSubjects = fetchSubjectsAndTopics; // Alias for consistency
   const handleCancelEdit = () => {
     setEditingQuestion(null);
     setActiveTab("manage");
