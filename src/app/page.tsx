@@ -6,13 +6,27 @@ import {
 import { supabase } from "@/lib/supabase";
 import { getSupabaseAdmin } from "@/lib/auth-verify";
 
+export const revalidate = 3600; // Revalidate every hour
+
 export default async function Home() {
-  const supabaseAdmin = getSupabaseAdmin();
-  
-  // Fetch dynamic stats
-  const { count: mcqCount } = await supabaseAdmin.from("questions").select("*", { count: "exact", head: true });
-  const { count: mockCount } = await supabase.from("tests").select("*", { count: "exact", head: true }).eq("type", "full");
-  const { count: userCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+  let mcqCount = 10000;
+  let mockCount = 50;
+  let userCount = 5000;
+
+  try {
+    // Attempt to fetch dynamic stats. 
+    // This may fail during local or Vercel static build if env vars aren't loaded into the prerender context.
+    const supabaseAdmin = getSupabaseAdmin();
+    const { count: mcqs } = await supabaseAdmin.from("questions").select("*", { count: "exact", head: true });
+    const { count: mocks } = await supabase.from("tests").select("*", { count: "exact", head: true }).eq("type", "full");
+    const { count: users } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+
+    if (mcqs) mcqCount = mcqs;
+    if (mocks) mockCount = mocks;
+    if (users) userCount = users;
+  } catch (err) {
+    console.warn("Could not fetch live counts during prerender, using fallbacks.", err);
+  }
   
   return (
     <div className="bg-[#121212] min-h-screen pt-20">
