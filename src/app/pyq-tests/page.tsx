@@ -2,7 +2,7 @@
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect, useMemo } from "react";
-import { BookOpen, ChevronRight, X, Trophy } from "lucide-react";
+import { ChevronRight, X, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";

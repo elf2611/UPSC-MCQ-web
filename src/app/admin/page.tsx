@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
-import { supabase } from "@/lib/supabase";
 import { PlusCircle, List, Pencil, Trash2, Brain, BookOpen, Save, CheckCircle2, LayoutDashboard } from "lucide-react";
 import { PdfUploader } from "@/components/pdf-uploader";
 import { DashboardTab } from "@/components/admin/dashboard-tab";
@@ -58,11 +57,7 @@ function AdminInner() {
   const [errorStr, setErrorStr] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    fetchSubjectsAndTopics();
-  }, []);
-
-  const fetchSubjectsAndTopics = async () => {
+  const fetchSubjectsAndTopics = useCallback(async () => {
     try {
       const token = await user?.getIdToken();
       const res = await fetch("/api/subjects-topics", {
@@ -77,7 +72,11 @@ function AdminInner() {
     } catch (e) {
       console.error("Failed to fetch taxonomy", e);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchSubjectsAndTopics();
+  }, [fetchSubjectsAndTopics]);
 
   const fetchSubjects = fetchSubjectsAndTopics; // Alias for consistency
   const handleCancelEdit = () => {

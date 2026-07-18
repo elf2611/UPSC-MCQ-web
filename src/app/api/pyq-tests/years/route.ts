@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw new Error(error.message);
 
-    return NextResponse.json({ years: data.map((d: any) => d.year) });
+    return NextResponse.json({ years: data.map((d: { year: number }) => d.year) });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
