@@ -21,7 +21,7 @@ const answerRowSchema = z.object({
 
 const submitSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
-  testId: z.string().uuid().optional(),
+  testId: z.string().uuid().nullable().optional(),
   mode: z.enum(['practice', 'exam']).default('practice'),
   source_section: z.string().optional(),
   startedAt: z.string().optional(),
