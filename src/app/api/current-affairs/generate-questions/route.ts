@@ -54,15 +54,18 @@ export async function GET(req: Request) {
     }
 
     // 3. Fetch unprocessed articles
+    console.log('[Generate Questions] Project URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('[Generate Questions] Using supabaseAdmin client instantiated via getSupabaseAdmin()');
     console.log('[Generate Questions] Querying daily_current_affairs for processed=false, limit=10');
+    
     const { data: articles, error: articlesErr } = await supabaseAdmin
       .from('daily_current_affairs')
       .select('*')
       .eq('processed', false)
       .limit(10); // Process up to 10 articles per run
     
-    console.log(`[Generate Questions] Query finished. Error: ${articlesErr?.message || 'None'}`);
-    console.log(`[Generate Questions] Rows returned: ${articles ? articles.length : 0}`);
+    console.log(`[Generate Questions] articlesErr:`, articlesErr);
+    console.log(`[Generate Questions] articles?.length:`, articles ? articles.length : 'undefined');
     if (articles && articles.length > 0) {
       console.log(`[Generate Questions] First row:`, JSON.stringify(articles[0], null, 2));
     }
