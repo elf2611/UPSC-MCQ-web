@@ -15,9 +15,15 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 
 // Service-role Supabase client — bypasses RLS for the profile read
 export function getSupabaseAdmin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+  }
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 }
 

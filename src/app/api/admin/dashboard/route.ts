@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { handleApiError } from '@/lib/logger';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 import { verifyAdminToken } from '@/lib/auth-verify';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const authResult = await verifyAdminToken(request);
     if (!authResult.ok) {
       return NextResponse.json(

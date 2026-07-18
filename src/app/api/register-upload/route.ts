@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { z } from 'zod';
 import { PDFDocument } from 'pdf-lib';
 import crypto from 'crypto';
@@ -18,6 +18,7 @@ const CHUNK_SIZE = 15; // Pages per chunk
 const MAX_PAYLOAD_SIZE = 10 * 1024; // 10KB
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const contentLength = Number(request.headers.get('content-length') || 0);
     if (contentLength > MAX_PAYLOAD_SIZE) {
@@ -62,10 +63,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many upload registrations. Please wait.' }, { status: 429 });
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    
 
     // 4. Download the file from Supabase Storage
     const { data: fileData, error: downloadError } = await supabaseAdmin

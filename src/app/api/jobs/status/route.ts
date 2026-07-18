@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { verifyAdminToken } from '@/lib/auth-verify';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     // 1. Verify admin via Firebase ID token
     const authResult = await verifyAdminToken(request);

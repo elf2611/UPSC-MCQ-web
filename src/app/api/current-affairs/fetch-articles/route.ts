@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import * as cheerio from 'cheerio';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { CURRENT_AFFAIRS_SOURCES } from '@/lib/current-affairs/sources';
 
 export async function GET(req: Request) {
+  const supabaseAdmin = getSupabaseAdmin();
   // 1. Verify cron secret to prevent unauthorized execution
   const authHeader = req.headers.get('authorization');
   if (
@@ -16,10 +17,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    
 
     let newArticlesCount = 0;
 

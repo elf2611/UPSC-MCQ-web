@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { z } from 'zod';
 import { handleApiError } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -17,6 +17,7 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     // 1. Enforce JSON payload size
     const contentLength = Number(request.headers.get('content-length') || 0);
@@ -76,10 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Create Supabase service-role client and generate signed upload URL
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    
 
     // 6. Check if bucket exists first
     const bucketName = 'pdf_uploads';

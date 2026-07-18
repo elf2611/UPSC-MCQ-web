@@ -8,7 +8,7 @@
 // tell you the truth about what this call actually did.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { verifyAdminToken } from '@/lib/auth-verify';
 import { handleApiError } from '@/lib/logger';
 import { processChunk } from '@/lib/chunk-processor';
@@ -26,6 +26,7 @@ function log(event_type: string, details: Record<string, unknown> = {}) {
 }
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     // 1. Auth
     const authResult = await verifyAdminToken(request);
@@ -37,10 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    
 
     // Optional uploadId passed from client
     let uploadId = undefined;

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { callGemini } from '@/lib/ai/gemini';
 import { GenerateRequestPayload } from '@/lib/ai/types';
 import crypto from 'crypto';
@@ -10,6 +10,7 @@ function normalizeHash(text: string): string {
 }
 
 export async function GET(req: Request) {
+  const supabaseAdmin = getSupabaseAdmin();
   // 1. Verify cron secret to prevent unauthorized execution
   const authHeader = req.headers.get('authorization');
   if (
@@ -19,10 +20,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  
 
   try {
     // 2. Claim a pending job for current affairs (if any)

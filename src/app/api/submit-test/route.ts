@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { z } from 'zod';
 import { handleApiError } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyUserToken } from '@/lib/auth-verify';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+
 
 const MAX_PAYLOAD_SIZE = 500 * 1024; // 500KB
 
@@ -31,6 +28,7 @@ const submitSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     // 0. Verify Auth Token
     const authResult = await verifyUserToken(request);

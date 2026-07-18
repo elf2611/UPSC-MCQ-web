@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { handleApiError } from '@/lib/logger';
@@ -6,10 +6,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 import { verifyAdminToken } from '@/lib/auth-verify';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+
 
 const MAX_PAYLOAD_SIZE = 5 * 1024 * 1024; // 5MB max since we might get hundreds of questions
 
@@ -36,6 +33,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 export async function POST(request: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin();
   try {
     const authResult = await verifyAdminToken(request);
     if (!authResult.ok) {
