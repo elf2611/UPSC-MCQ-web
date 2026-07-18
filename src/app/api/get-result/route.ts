@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 3. Fetch the answers for this attempt
+    // 3. Fetch the answers for this attempt (without nested question query)
     const { data: answersData, error: answersError } = await supabaseAdmin
       .from("attempt_answers")
       .select(`
@@ -47,8 +47,26 @@ export async function GET(request: NextRequest) {
         question_id,
         selected_option,
         is_correct,
-        marked_for_review,
-        questions (
+        marked_for_review
+      `)
+      .eq("attempt_id", attemptId)
+      .order("id");
+
+    if (answersError) {
+      return NextResponse.json(
+        { error: "Failed to load attempt answers.", detail: answersError.message },
+        { status: 500 }
+      );
+    }
+    
+    // 4. Fetch the questions manually by their IDs to avoid relying on foreign key metadata in PostgREST
+    const questionIds = answersData?.map((ans) => ans.question_id) || [];
+    let questionsData: any[] = [];
+    
+    if (questionIds.length > 0) {
+      const { data: qData, error: qError } = await supabaseAdmin
+        .from("questions")
+        .select(`
           id,
           question_text,
           option_a,
@@ -65,21 +83,28 @@ export async function GET(request: NextRequest) {
           static_topic_link,
           subject,
           topic
-        )
-      `)
-      .eq("attempt_id", attemptId)
-      .order("id");
-
-    if (answersError) {
-      return NextResponse.json(
-        { error: "Failed to load attempt answers.", detail: answersError.message },
-        { status: 500 }
-      );
+        `)
+        .in("id", questionIds);
+        
+      if (qError) {
+        console.error("Failed to load questions for attempt:", qError);
+      } else {
+        questionsData = qData || [];
+      }
     }
+    
+    // Create a map for fast lookup
+    const questionMap = new Map(questionsData.map(q => [q.id, q]));
+    
+    // Merge answers with questions
+    const mergedAnswers = answersData?.map(ans => ({
+      ...ans,
+      questions: questionMap.get(ans.question_id) || null
+    })) || [];
 
     return NextResponse.json({
       attempt: attemptData,
-      answers: answersData || []
+      answers: mergedAnswers
     });
 
   } catch (error: unknown) {
