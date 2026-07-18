@@ -23,30 +23,38 @@ export async function GET(req: Request) {
 
     let newArticlesCount = 0;
 
-    for (const source of CURRENT_AFFAIRS_SOURCES) {
-      console.log(`[Fetch Articles] Processing source: ${source.name}`);
+        for (const source of CURRENT_AFFAIRS_SOURCES) {
+      console.log(`\n==========================================`);
+      console.log(`[Fetch Articles] Queried source: ${source.name} (${source.url})`);
       try {
         const response = await fetch(source.url, { 
           headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } 
         });
         if (!response.ok) {
-          console.error(`Failed to fetch RSS from ${source.name}: ${response.status}`);
+          console.error(`[Fetch Articles] ❌ HTTP Request Failed for ${source.name}: Status ${response.status}`);
           continue;
         }
+        console.log(`[Fetch Articles] ✅ HTTP Request Succeeded for ${source.name}`);
 
         const xmlText = await response.text();
         const $ = cheerio.load(xmlText, { xmlMode: true });
         
-        // Extract links from items
-        const links: string[] = [];
+        const links = [];
         $('item').each((i, el) => {
-          if (i >= 5) return; // Only process the latest 5 articles per source
+          if (i >= 5) return;
           const link = $(el).find('link').text();
           if (link) links.push(link);
         });
 
+        console.log(`[Fetch Articles] 🔍 Extracted ${links.length} article links from ${source.name}`);
+        if (links.length === 0) {
+          console.warn(`[Fetch Articles] ⚠️ No links found for ${source.name}. Check if RSS XML structure changed.`);
+        }
+
+        let duplicatesFiltered = 0;
+        let insertedForSource = 0;
+
         for (const link of links) {
-          // Check if article already exists
           const { data: existing } = await supabaseAdmin
             .from('daily_current_affairs')
             .select('id')
@@ -54,24 +62,29 @@ export async function GET(req: Request) {
             .limit(1);
 
           if (existing && existing.length > 0) {
-            continue; // Skip already processed article
+            duplicatesFiltered++;
+            continue;
           }
 
-          // Fetch the article HTML
           const articleRes = await fetch(link, { 
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } 
           });
-          if (!articleRes.ok) continue;
+          if (!articleRes.ok) {
+            console.error(`[Fetch Articles] ❌ Failed to fetch article HTML for ${link}: Status ${articleRes.status}`);
+            continue;
+          }
 
           const htmlText = await articleRes.text();
-          
-          // Use jsdom and readability to extract clean text
           const doc = new JSDOM(htmlText, { url: link });
           const reader = new Readability(doc.window.document);
           const article = reader.parse();
 
-          if (!article || !article.textContent || article.textContent.length < 500) {
-            console.log(`[Fetch Articles] Skipped ${link} (too short or unreadable)`);
+          if (!article || !article.textContent) {
+            console.log(`[Fetch Articles] ⚠️ Parse Failure for ${link}: Readability could not extract content.`);
+            continue;
+          }
+          if (article.textContent.length < 500) {
+            console.log(`[Fetch Articles] ⚠️ Skipped ${link}: Extracted content too short (${article.textContent.length} chars).`);
             continue;
           }
 
@@ -84,13 +97,19 @@ export async function GET(req: Request) {
             });
 
           if (insertError) {
-            console.error(`[Fetch Articles] Failed to insert article ${link}:`, insertError);
+            console.error(`[Fetch Articles] ❌ DB Insert Failed for ${link}:`, insertError.message);
           } else {
+            insertedForSource++;
             newArticlesCount++;
           }
         }
+        
+        console.log(`[Fetch Articles] 📊 Summary for ${source.name}:`);
+        console.log(`   - Duplicates filtered: ${duplicatesFiltered}`);
+        console.log(`   - Actually inserted: ${insertedForSource}`);
+
       } catch (sourceErr) {
-        console.error(`[Fetch Articles] Error processing source ${source.name}:`, sourceErr);
+        console.error(`[Fetch Articles] ❌ Exception processing source ${source.name}:`, sourceErr);
       }
     }
 
