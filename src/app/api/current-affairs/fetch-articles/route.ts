@@ -39,7 +39,7 @@ export async function GET(req: Request) {
         const xmlText = await response.text();
         const $ = cheerio.load(xmlText, { xmlMode: true });
         
-        const links = [];
+        const links: string[] = [];
         $('item').each((i, el) => {
           if (i >= 5) return;
           const link = $(el).find('link').text();
