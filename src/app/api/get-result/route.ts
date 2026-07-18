@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     
     // 4. Fetch the questions manually by their IDs to avoid relying on foreign key metadata in PostgREST
     const questionIds = answersData?.map((ans) => ans.question_id) || [];
-    let questionsData: any[] = [];
+    let questionsData: Record<string, unknown>[] = [];
     
     if (questionIds.length > 0) {
       const { data: qData, error: qError } = await supabaseAdmin
