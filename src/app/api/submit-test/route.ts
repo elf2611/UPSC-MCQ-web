@@ -140,6 +140,34 @@ export async function POST(request: NextRequest) {
       throw new Error(`Failed to commit test submission: ${rpcError.message}`);
     }
 
+    // 6. Auto-populate Revision Queue for wrong answers
+    const wrongAnswers = gradedAnswers.filter(a => a.is_correct === false);
+    if (wrongAnswers.length > 0) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const next_review_date = tomorrow.toISOString().split('T')[0];
+
+      const revisionRows = wrongAnswers.map(r => ({
+        user_id: userId,
+        question_id: r.question_id,
+        next_review_date,
+        interval_days: 1,
+        ease_factor: 2.5,
+        repetitions: 0
+      }));
+
+      const { error: revisionError } = await supabaseAdmin
+        .from('revision_queue')
+        .upsert(revisionRows, { 
+          onConflict: 'user_id,question_id',
+          ignoreDuplicates: true 
+        });
+
+      if (revisionError) {
+        console.error('Failed to upsert to revision_queue:', revisionError);
+      }
+    }
+
     return NextResponse.json({ attemptId });
 
   } catch (err: unknown) {
