@@ -6,6 +6,8 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 import { verifyAdminToken } from '@/lib/auth-verify';
 
+export const dynamic = 'force-dynamic';
+
 
 
 const MAX_PAYLOAD_SIZE = 5 * 1024 * 1024; // 5MB max since we might get hundreds of questions

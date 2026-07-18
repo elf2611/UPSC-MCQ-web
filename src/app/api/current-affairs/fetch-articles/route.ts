@@ -5,6 +5,8 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { CURRENT_AFFAIRS_SOURCES } from '@/lib/current-affairs/sources';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   const supabaseAdmin = getSupabaseAdmin();
   // 1. Verify cron secret to prevent unauthorized execution

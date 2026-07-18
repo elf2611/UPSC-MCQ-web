@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken, getSupabaseAdmin } from '@/lib/auth-verify';
 import * as z from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const topicSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1),

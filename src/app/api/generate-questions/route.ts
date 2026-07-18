@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateQuestions } from "@/lib/ai/provider";
 
+export const dynamic = 'force-dynamic';
+
 // Basic in-memory rate limiting map for demonstration (resets on server restart)
 const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
 const LIMIT = 10; // 10 requests per 10 minutes

@@ -5,6 +5,8 @@ import { handleApiError } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyUserToken } from '@/lib/auth-verify';
 
+export const dynamic = 'force-dynamic';
+
 
 
 const MAX_PAYLOAD_SIZE = 500 * 1024; // 500KB

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { awardXP, updateStreak, checkBadges } from "@/lib/gamification";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, correctCount, attemptedCount, isMockTest } = await req.json();

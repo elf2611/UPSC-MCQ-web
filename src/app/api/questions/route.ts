@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const authResult = await verifyUserToken(request);
   if (!authResult.ok) {

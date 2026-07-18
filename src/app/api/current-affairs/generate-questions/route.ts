@@ -4,6 +4,8 @@ import { callGemini } from '@/lib/ai/gemini';
 import { GenerateRequestPayload } from '@/lib/ai/types';
 import crypto from 'crypto';
 
+export const dynamic = 'force-dynamic';
+
 function normalizeHash(text: string): string {
   const normalized = text.toLowerCase().trim().replace(/\s+/g, ' ');
   return crypto.createHash('sha256').update(normalized).digest('hex');

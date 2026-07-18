@@ -4,6 +4,8 @@ import { handleApiError } from '@/lib/logger';
 import { verifyUserToken, getSupabaseAdmin } from '@/lib/auth-verify';
 import { checkRateLimit } from '@/lib/rate-limit';
 
+export const dynamic = 'force-dynamic';
+
 const verifySchema = z.object({
   question_id: z.string().uuid(),
   selected_option: z.string().min(1)

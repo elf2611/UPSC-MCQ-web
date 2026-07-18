@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '@/lib/auth-verify';
 import { handleApiError, logger } from '@/lib/logger';
 import { verifyAdminToken } from '@/lib/auth-verify';
 
+export const dynamic = 'force-dynamic';
+
 
 
 export async function POST(request: NextRequest) {

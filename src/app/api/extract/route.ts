@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
+
+export const dynamic = 'force-dynamic';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse");
 
