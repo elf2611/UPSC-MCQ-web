@@ -13,6 +13,7 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [difficulty, setDifficulty] = useState("all");
+  const [yearFilter, setYearFilter] = useState("all");
   const [page, setPage] = useState(0);
   const [historyQuestionId, setHistoryQuestionId] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -44,13 +45,20 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
     userId: user?.uid || "",
     page: page.toString(),
     search: debouncedSearch,
-    difficulty: difficulty
+    difficulty: difficulty,
+    year: yearFilter
   });
 
   const { data, error, isLoading, mutate } = useSWR(
     user?.uid ? `/api/admin/search-questions?${queryParams.toString()}` : null,
     fetcher
   );
+
+  const { data: yearsData } = useSWR(
+    user?.uid ? '/api/pyq-tests/years' : null,
+    fetcher
+  );
+  const years = yearsData?.years || [];
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this question?")) {
@@ -119,6 +127,18 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
           </select>
+
+          <select
+            value={yearFilter}
+            onChange={(e) => { setYearFilter(e.target.value); setPage(0); }}
+            className="bg-background border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+          >
+            <option value="all">All Years</option>
+            <option value="pyq_only">All PYQs</option>
+            {years.map((y: number) => (
+              <option key={y} value={y.toString()}>{y}</option>
+            ))}
+          </select>
           
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -166,6 +186,7 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
               <th className="pb-3 text-sm font-medium text-gray-400">Subject</th>
               <th className="pb-3 text-sm font-medium text-gray-400">Topic</th>
               <th className="pb-3 text-sm font-medium text-gray-400">Subtopic</th>
+              <th className="pb-3 text-sm font-medium text-gray-400">Year</th>
               <th className="pb-3 text-sm font-medium text-gray-400">Question</th>
               <th className="pb-3 text-sm font-medium text-gray-400">Diff</th>
               <th className="pb-3 text-sm font-medium text-gray-400 text-right">Actions</th>
@@ -184,6 +205,7 @@ export function ManageTab({ onEdit }: { onEdit: (q: Record<string, unknown>) => 
                   <td className="py-3 text-gray-400 pr-4">{q.subject as string}</td>
                   <td className="py-3 text-gray-400 pr-4">{q.topic as string}</td>
                   <td className="py-3 text-gray-500 text-xs pr-4">{q.subtopic ? (q.subtopic as string) : '-'}</td>
+                  <td className="py-3 text-gray-500 text-xs pr-4">{q.year ? String(q.year) : '-'}</td>
                   <td className="py-3 text-gray-300 pr-4">
                     <div className="max-w-md truncate">{q.question_text as string}</div>
                   </td>

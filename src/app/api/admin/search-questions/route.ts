@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '0', 10);
     const search = searchParams.get('search') || '';
     const difficulty = searchParams.get('difficulty') || '';
+    const year = searchParams.get('year') || '';
 
     let query = supabaseAdmin.from('questions').select('*', { count: 'exact' });
 
@@ -36,6 +37,14 @@ export async function GET(request: NextRequest) {
 
     if (difficulty && difficulty !== 'all') {
       query = query.eq('difficulty', difficulty.toLowerCase());
+    }
+
+    if (year && year !== 'all') {
+      if (year === 'pyq_only') {
+        query = query.not('year', 'is', null);
+      } else {
+        query = query.eq('year', parseInt(year, 10));
+      }
     }
 
     query = query.order('created_at', { ascending: false }).range(page * 50, (page + 1) * 50 - 1);
