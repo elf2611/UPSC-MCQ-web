@@ -9,9 +9,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.json({
-    keyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length ?? 0,
-    keyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 12) ?? 'MISSING',
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'MISSING',
-  });
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+  let role = 'UNKNOWN';
+  try {
+    const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64').toString());
+    role = payload.role ?? 'NO ROLE FIELD';
+  } catch (e) {
+    role = 'DECODE FAILED';
+  }
+  
+  return NextResponse.json({ role, keyLength: key.length });
 }
