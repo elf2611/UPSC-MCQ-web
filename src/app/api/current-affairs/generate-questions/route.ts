@@ -64,6 +64,13 @@ export async function GET(req: Request) {
       .eq('processed', false)
       .limit(10); // Process up to 10 articles per run
     
+    console.log('DEBUG generate-questions', JSON.stringify({
+      jobId,
+      articlesFound: articles?.length ?? 0,
+      articlesErr: articlesErr?.message ?? null,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    }));
+    
     console.log(`[Generate Questions] articlesErr:`, articlesErr);
     console.log(`[Generate Questions] articles?.length:`, articles ? articles.length : 'undefined');
     if (articles && articles.length > 0) {
