@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
-import { PlusCircle, List, Pencil, Trash2, Brain, BookOpen, Save, CheckCircle2, LayoutDashboard } from "lucide-react";
+import { PlusCircle, List, Pencil, Trash2, Brain, BookOpen, Save, CheckCircle2, LayoutDashboard, CheckSquare } from "lucide-react";
 import { PdfUploader } from "@/components/pdf-uploader";
 import { DashboardTab } from "@/components/admin/dashboard-tab";
 import { ManageTab } from "@/components/admin/manage-tab";
+import { ReviewTab } from "@/components/admin/review-tab";
 import { useAuth } from "@/hooks/useAuth";
 import { QuestionForm, QuestionFormValues } from "@/components/admin/question-form";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 
 function AdminInner() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "add" | "manage" | "subjects" | "generator">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "add" | "manage" | "subjects" | "generator" | "review">("dashboard");
   const [editingQuestion, setEditingQuestion] = useState<QuestionFormValues | null>(null);
   const { user } = useAuth();
 
@@ -330,12 +331,13 @@ function AdminInner() {
             { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
             { id: "add", label: "Add Question", icon: PlusCircle },
             { id: "manage", label: "Manage Questions", icon: List },
+            { id: "review", label: "Review Staged", icon: CheckSquare },
             { id: "subjects", label: "Subjects & Topics", icon: BookOpen },
             { id: "generator", label: "AI Question Studio", icon: Brain },
           ].map(t => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id as "dashboard" | "add" | "manage" | "subjects" | "generator")}
+              onClick={() => setActiveTab(t.id as "dashboard" | "add" | "manage" | "subjects" | "generator" | "review")}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
                 activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-gray-400 hover:text-white hover:bg-white/5"
               }`}
@@ -372,6 +374,9 @@ function AdminInner() {
             setActiveTab("add");
           }} />
         )}
+
+        {/* Review Staged Questions Tab */}
+        {activeTab === "review" && <ReviewTab />}
       
         {/* ================= SUBJECTS & TOPICS ================= */}
         {activeTab === "subjects" && (
