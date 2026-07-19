@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Check, X, Pencil, Trash2, Loader2, Save } from "lucide-react";
+import { Check, X, Pencil } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StagedQuestion = Record<string, any>;
 
 export function ReviewTab() {
@@ -27,8 +28,8 @@ export function ReviewTab() {
       if (!res.ok) throw new Error(result.error || "Failed to fetch staged questions");
       setQuestions(result.data || []);
       setSelectedIds(new Set());
-    } catch (err: any) {
-      setErrorMsg(err.message);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -74,8 +75,8 @@ export function ReviewTab() {
       if (!res.ok) throw new Error(result.error || "Failed to approve");
       setEditingId(null);
       await fetchQuestions();
-    } catch (err: any) {
-      alert("Approval failed: " + err.message);
+    } catch (err: unknown) {
+      alert("Approval failed: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setProcessing(false);
     }
@@ -97,8 +98,8 @@ export function ReviewTab() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to reject");
       await fetchQuestions();
-    } catch (err: any) {
-      alert("Rejection failed: " + err.message);
+    } catch (err: unknown) {
+      alert("Rejection failed: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setProcessing(false);
     }
