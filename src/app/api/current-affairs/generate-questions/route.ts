@@ -5,6 +5,7 @@ import { GenerateRequestPayload } from '@/lib/ai/types';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function normalizeHash(text: string): string {
   const normalized = text.toLowerCase().trim().replace(/\s+/g, ' ');

@@ -6,6 +6,7 @@ import { Readability } from '@mozilla/readability';
 import { CURRENT_AFFAIRS_SOURCES } from '@/lib/current-affairs/sources';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: Request) {
   const supabaseAdmin = getSupabaseAdmin();
