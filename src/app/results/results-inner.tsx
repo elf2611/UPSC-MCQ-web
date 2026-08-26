@@ -9,7 +9,52 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
 } from "recharts";
 import { XCircle } from "lucide-react";
+import { ProtectedRoute } from "@/components/protected-route";
+import React from "react";
 import Link from "next/link";
+
+function AnimatedCounter({ value, decimals = 0 }: { value: number; decimals?: number }) {
+  const [count, setCount] = React.useState(0);
+  React.useEffect(() => {
+    let startTime: number;
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = timestamp - startTime;
+      const percentage = Math.min(progress / 2000, 1);
+      const easeProgress = percentage === 1 ? 1 : 1 - Math.pow(2, -10 * percentage);
+      setCount(value * easeProgress);
+      if (progress < 2000) requestAnimationFrame(animate); else setCount(value);
+    };
+    requestAnimationFrame(animate);
+  }, [value]);
+  return <span>{count.toFixed(decimals)}</span>;
+}
+
+function CompletionAnimation() {
+  const [show, setShow] = React.useState(true);
+  React.useEffect(() => {
+    const t = setTimeout(() => setShow(false), 2500);
+    return () => clearTimeout(t);
+  }, []);
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-zinc-950/80 backdrop-blur-sm animate-[fadeOut_0.5s_ease-out_2s_forwards]">
+      <div className="relative flex items-center justify-center animate-[scaleIn_0.5s_cubic-bezier(0.34,1.56,0.64,1)]">
+        <div className="absolute w-32 h-32 bg-amber-500/20 rounded-full animate-ping" style={{ animationDuration: '1.5s' }} />
+        <div className="relative w-24 h-24 bg-amber-500 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(245,158,11,0.4)]">
+          <svg className="w-12 h-12 text-zinc-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" className="animate-[strokeDraw_0.5s_ease-out_0.2s_forwards]" style={{ strokeDasharray: 24, strokeDashoffset: 24 }} />
+          </svg>
+        </div>
+      </div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes strokeDraw { to { stroke-dashoffset: 0; } }
+        @keyframes fadeOut { to { opacity: 0; visibility: hidden; } }
+        @keyframes scaleIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      `}} />
+    </div>
+  );
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Question {
@@ -220,8 +265,10 @@ export default function ResultsInner() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-black text-zinc-300 pb-20">
-        {/* ── TOP HEADER ── */}
+      <div className="min-h-screen bg-zinc-950 pb-20">
+        <CompletionAnimation />
+        
+        {/* Header */}
         <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
             <h1 className="text-white font-semibold text-xl">Test Results</h1>
@@ -254,17 +301,17 @@ export default function ResultsInner() {
                     stroke={accuracy >= 60 ? "#f59e0b" : "#ef4444"}
                     strokeWidth="12"
                     strokeDasharray={`${2 * Math.PI * 60}`}
-                    strokeDashoffset={`${2 * Math.PI * 60 * (1 - accuracy/100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 60 * (1 - (accuracy || 0)/100)}`}
                     strokeLinecap="round"
-                    className="transition-all duration-1000" />
+                    className="transition-all duration-[2000ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-amber-400">{accuracy}%</span>
+                  <span className="text-3xl font-bold text-amber-400"><AnimatedCounter value={accuracy} />%</span>
                   <span className="text-zinc-400 text-xs mt-1">Accuracy</span>
                 </div>
               </div>
               <div className="text-4xl font-bold text-white mb-1">
-                {score.toFixed(1)}
+                <AnimatedCounter value={score} decimals={1} />
                 <span className="text-xl text-zinc-400 font-normal ml-1">/ {totalMarks}</span>
               </div>
               <p className="text-zinc-400 text-sm">Total Score</p>
@@ -274,16 +321,16 @@ export default function ResultsInner() {
             <div className="lg:col-span-3 grid grid-cols-2 gap-4">
               {/* Correct */}
               <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-green-500 flex flex-col justify-center">
-                <div className="text-3xl font-bold text-green-400 mb-1">{correct}</div>
+                <div className="text-3xl font-bold text-green-400 mb-1"><AnimatedCounter value={correct} /></div>
                 <div className="text-zinc-400 text-sm font-medium">Correct</div>
-                <div className="text-green-500 text-xs mt-1 font-medium">+{(correct * 2).toFixed(2)} marks</div>
+                <div className="text-green-500 text-xs mt-1 font-medium">+<AnimatedCounter value={correct * 2} decimals={2} /> marks</div>
               </div>
 
               {/* Wrong */}
               <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-red-500 flex flex-col justify-center">
-                <div className="text-3xl font-bold text-red-400 mb-1">{wrong}</div>
+                <div className="text-3xl font-bold text-red-400 mb-1"><AnimatedCounter value={wrong} /></div>
                 <div className="text-zinc-400 text-sm font-medium">Incorrect</div>
-                <div className="text-red-500 text-xs mt-1 font-medium">-{(wrong * (2/3)).toFixed(2)} marks</div>
+                <div className="text-red-500 text-xs mt-1 font-medium">-<AnimatedCounter value={wrong * (2/3)} decimals={2} /> marks</div>
               </div>
 
               {/* Skipped */}
@@ -341,7 +388,7 @@ export default function ResultsInner() {
                       ? 'bg-amber-500 text-black'
                       : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
                   }`}>
-                  {f} {f === 'All' ? `(${answers.length})` : f === 'Correct' ? `(${correct})` : f === 'Incorrect' ? `(${wrong})` : `(${unattempted})`}
+                  {f} {f === 'All' ? `(${answers.length})` : f === 'Correct' ? `($<AnimatedCounter value={correct} />)` : f === 'Incorrect' ? `($<AnimatedCounter value={wrong} />)` : `(${unattempted})`}
                 </button>
               ))}
             </div>

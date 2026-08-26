@@ -583,14 +583,20 @@ export default function TestInterfaceInner() {
                     if (showAsCorrect) btnStyle = "bg-green-500/20 border-green-500 text-white";
                     else if (showAsWrong) btnStyle = "bg-red-500/20 border-red-500 text-white";
                     else btnStyle = "bg-[#1a1a1a] border-white/5 text-gray-500 opacity-70";
-                  }
-
                   return (
                     <button
                       key={opt}
                       disabled={feedbackMode || isVerifying}
                       onClick={() => handleSelectOption(opt)}
-                      className={`w-full text-left p-4 rounded-xl border transition-all flex items-start gap-4 ${btnStyle} ${isVerifying ? 'opacity-70 cursor-wait' : ''}`}
+                      className={`
+                        w-full text-left p-4 rounded-xl border flex items-start gap-4 
+                        transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] 
+                        ${showAsCorrect ? "bg-green-500/20 border-green-500 text-white" :
+                          showAsWrong ? "bg-red-500/20 border-red-500 text-white" :
+                          isSelected ? "bg-primary/10 border-primary text-white shadow-[0_0_20px_rgba(255,191,0,0.08)]" : 
+                          feedbackMode ? "bg-[#1a1a1a] border-white/5 text-gray-500 opacity-70" :
+                          "bg-[#1a1a1a] border-white/5 text-gray-300 hover:border-white/20 hover:text-white"
+                        } ${isVerifying ? 'opacity-70 cursor-wait' : ''}`}
                     >
                       <span className={`flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center font-bold text-sm transition-colors ${
                         showAsCorrect ? "bg-green-500 border-green-500 text-white" :
@@ -763,8 +769,8 @@ export default function TestInterfaceInner() {
 
       {/* Custom Toast Notification */}
       {toastMessage && (
-        <div className={`fixed bottom-6 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in ${
-          toastMessage.isLevelUp ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400" : "bg-[#1a1a1a] text-amber-500 border-white/10"
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] border flex items-center gap-3 animate-in slide-in-from-top-8 fade-in duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md ${
+          toastMessage.isLevelUp ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400" : "bg-[#1a1a1a]/80 text-white border-white/10"
         }`}>
           {toastMessage.isLevelUp && <span className="text-2xl">🎉</span>}
           <span className="font-bold text-sm">{toastMessage.message}</span>

@@ -270,7 +270,7 @@ export default function PerformancePage() {
                     <XAxis dataKey="name" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ backgroundColor: "#1a1a1a", borderColor: "#374151", color: "#fff", borderRadius: "8px" }} />
-                    <Line type="monotone" dataKey="score" stroke="#ffbf00" strokeWidth={3} dot={{ fill: "#ffbf00", r: 5, strokeWidth: 2, stroke: "#1a1a1a" }} activeDot={{ r: 7 }} />
+                    <Line type="monotone" dataKey="score" stroke="#ffbf00" strokeWidth={3} dot={{ fill: "#ffbf00", r: 5, strokeWidth: 2, stroke: "#1a1a1a" }} activeDot={{ r: 7 }} isAnimationActive={true} animationDuration={2000} animationEasing="ease-in-out" />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (

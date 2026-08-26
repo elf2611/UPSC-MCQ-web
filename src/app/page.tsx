@@ -1,358 +1,575 @@
-import Link from "next/link";
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useState, useRef } from 'react';
 import { 
-  Bookmark, CheckCircle2, ChevronDown,
-  XCircle, Link as LinkIcon, RefreshCw, Flame, BarChart2, Target
-} from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { getSupabaseAdmin } from "@/lib/auth-verify";
+  ChevronDown, 
+  BookOpen, 
+  Brain, 
+  Clock, 
+  ShieldCheck, 
+  Zap, 
+  Target, 
+  CheckCircle2, 
+  ChevronRight, 
+  BarChart3,
+  ArrowRight
+} from 'lucide-react';
 
-export const revalidate = 3600; // Revalidate every hour
+// --- CUSTOM HOOKS ---
 
-export default async function Home() {
-  let mcqCount = 10000;
-  let mockCount = 50;
-  let userCount = 5000;
+function useScrollReveal(threshold = 0.1) {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  try {
-    // Attempt to fetch dynamic stats. 
-    // This may fail during local or Vercel static build if env vars aren't loaded into the prerender context.
-    const supabaseAdmin = getSupabaseAdmin();
-    const { count: mcqs } = await supabaseAdmin.from("questions").select("*", { count: "exact", head: true });
-    const { count: mocks } = await supabase.from("tests").select("*", { count: "exact", head: true }).eq("type", "full");
-    const { count: users } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (mediaQuery.matches) {
+      setIsVisible(true);
+      return;
+    }
 
-    if (mcqs) mcqCount = mcqs;
-    if (mocks) mockCount = mocks;
-    if (users) userCount = users;
-  } catch (err) {
-    console.warn("Could not fetch live counts during prerender, using fallbacks.", err);
-  }
-  
-  return (
-    <div className="bg-[#121212] min-h-screen pt-20">
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold, rootMargin: '0px 0px -50px 0px' }
+    );
+
+    if (ref.current) observer.observe(ref.current);
+    return () => {
+      if (ref.current) observer.unobserve(ref.current); // eslint-disable-line react-hooks/exhaustive-deps
+    };
+  }, [threshold]);
+
+  return { ref, isVisible };
+}
+
+function useScrollProgress() {
+  const [progress, setProgress] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
       
-      {/* 1. Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          
-          <div className="max-w-2xl">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-bold text-white leading-tight mb-6">
-              Master UPSC Prelims with PYQ-Based Mock Tests
-            </h1>
-            <p className="text-lg text-gray-300 mb-4">
-              The only UPSC platform that explains why wrong answers are wrong &mdash; not just what&apos;s right.
-            </p>
-            <p className="text-sm text-gray-400 mb-10 italic">
-              Curated by UPSC aspirants who&apos;ve cleared Prelims.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link 
-                href="/test-interface" 
-                className="px-8 py-3.5 bg-primary text-primary-foreground font-semibold rounded-md hover:bg-primary/90 transition-colors text-center"
-              >
-                Start Free Test
-              </Link>
-              <Link 
-                href="/practice-tests" 
-                className="px-8 py-3.5 bg-transparent border border-white/20 text-white font-semibold rounded-md hover:bg-white/5 transition-colors text-center"
-              >
-                Explore Question Bank
-              </Link>
-            </div>
-          </div>
+      const start = rect.top - (viewportHeight / 1.5);
+      const height = rect.height;
+      
+      let p = (0 - start) / height;
+      p = Math.max(0, Math.min(1, p));
+      setProgress(p);
+    };
 
-          <div className="relative">
-            {/* Mockup UI Window */}
-            <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-6 shadow-2xl relative z-10">
-              <div className="flex justify-between items-center mb-6">
-                <div className="w-1/3 bg-white/10 h-2 rounded-full overflow-hidden">
-                  <div className="bg-primary w-[5%] h-full"></div>
-                </div>
-                <div className="text-primary font-mono text-xl tracking-wider">02:45:00</div>
-              </div>
-              <div className="text-sm text-gray-400 mb-2 font-medium">Question 5 of 100</div>
-              <h3 className="text-white text-lg font-medium mb-6 leading-relaxed">
-                Which among the following features of the Indian Constitution is borrowed from the British Constitution?
-              </h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                <div className="border border-white/10 bg-[#222] p-4 rounded-md text-gray-300 text-sm">A. Rule of Law</div>
-                <div className="border border-white/10 bg-[#222] p-4 rounded-md text-gray-300 text-sm">B. Fundamental Rights</div>
-                <div className="border border-primary bg-primary/10 p-4 rounded-md text-white text-sm flex justify-between items-center">
-                  C. Parliamentary Form of Government
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                </div>
-                <div className="border border-white/10 bg-[#222] p-4 rounded-md text-gray-300 text-sm">D. Directive Principles of State Policy</div>
-              </div>
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-              <div className="flex justify-between items-center border-t border-white/10 pt-4">
-                <button className="text-gray-400 text-sm">Previous</button>
-                <button className="bg-primary/20 text-primary px-8 py-2 rounded-full text-sm font-medium">Next Question</button>
-                <button className="text-gray-400 text-sm flex items-center gap-1"><Bookmark className="w-4 h-4"/> Flag</button>
-              </div>
-            </div>
-            {/* Glow effects */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-primary/20 blur-[100px] -z-10 rounded-full"></div>
-          </div>
+  return { ref, progress };
+}
+
+// --- COMPONENTS ---
+
+function CountUp({ end, suffix = "", duration = 2000 }: { end: number, suffix?: string, duration?: number }) {
+  const [count, setCount] = useState(0);
+  const { ref, isVisible } = useScrollReveal(0.5);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    
+    let startTime: number;
+    let animationFrame: number;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = timestamp - startTime;
+      const percentage = Math.min(progress / duration, 1);
+      
+      const easeProgress = percentage === 1 ? 1 : 1 - Math.pow(2, -10 * percentage);
+      setCount(Math.floor(end * easeProgress));
+
+      if (progress < duration) {
+        animationFrame = requestAnimationFrame(animate);
+      } else {
+        setCount(end);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [end, duration, isVisible]);
+
+  return <span ref={ref}>{count}{suffix}</span>;
+}
+
+function FAQItem({ question, answer, delay }: { question: string, answer: string, delay: number }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const { ref, isVisible } = useScrollReveal(0.1);
+
+  return (
+    <div 
+      ref={ref}
+      className={`bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden hover:border-white/10 transition-all duration-500 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex justify-between items-center p-6 text-left focus:outline-none group"
+      >
+        <span className="font-bold text-white text-lg group-hover:text-primary transition-colors">{question}</span>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-white/5 group-hover:bg-primary/10 transition-colors`}>
+          <ChevronDown className={`w-5 h-5 text-gray-400 group-hover:text-primary transition-transform duration-300 ease-in-out ${isOpen ? 'rotate-180' : ''}`} />
         </div>
-      </section>
-
-      {/* 2. Stats Bar */}
-      <section className="bg-[#181818] border-y border-white/5 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">{(mcqCount || 0).toLocaleString()}+</div>
-              <div className="text-sm text-gray-400">MCQs</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">{(mockCount || 0).toLocaleString()}+</div>
-              <div className="text-sm text-gray-400">Mock Tests</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">{(userCount || 0).toLocaleString()}+</div>
-              <div className="text-sm text-gray-400">Active Students</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary mb-2">All India</div>
-              <div className="text-sm text-gray-400">Topic Coverage</div>
-            </div>
-          </div>
+      </button>
+      <div 
+        className="grid transition-all duration-300 ease-in-out"
+        style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
+          <p className="p-6 pt-0 text-gray-400 leading-relaxed">
+            {answer}
+          </p>
         </div>
-      </section>
-
-      {/* 3. Features Grid */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <h2 className="text-3xl md:text-4xl font-serif font-bold text-white text-center mb-16">
-          Everything You Need to Crack Prelims
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <FeatureCard 
-            icon={<XCircle className="w-5 h-5 text-red-500" />}
-            title="Why Wrong Explanations"
-            description="Every wrong option is explained. We show exactly why A, B, and C fail — so you stop making the same mistake twice."
-            amberStyle
-          />
-          <FeatureCard 
-            icon={<Target className="w-5 h-5 text-amber-500" />}
-            title="Elimination Technique Tips"
-            description="UPSC-specific logic for every question. Learn to eliminate options confidently even when you don't know the answer."
-            amberStyle
-          />
-          <FeatureCard 
-            icon={<LinkIcon className="w-5 h-5 text-amber-500" />}
-            title="Current Affairs → Syllabus Links"
-            description="Every CA question is linked to the static syllabus topic it connects to. Bridge the gap between The Hindu and your textbook."
-            amberStyle
-          />
-          <FeatureCard 
-            icon={<RefreshCw className="w-5 h-5 text-gray-400" />}
-            title="Spaced Repetition Revision"
-            description="Our SRS system automatically resurfaces what you forget at the perfect time. Science-backed, habit-forming."
-          />
-          <FeatureCard 
-            icon={<Flame className="w-5 h-5 text-gray-400" />}
-            title="Daily Streak System"
-            description="Build the daily practice habit that separates those who clear Prelims from those who repeat it."
-          />
-          <FeatureCard 
-            icon={<BarChart2 className="w-5 h-5 text-gray-400" />}
-            title="All India Benchmarking"
-            description="Know where you stand against serious aspirants preparing right now. No illusions, just honest performance data."
-          />
-        </div>
-      </section>
-
-      {/* 4. How it works (Requested Section) */}
-      <section className="bg-[#181818] py-20 border-y border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-serif font-bold text-white text-center mb-16">
-            How it works
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary/20">
-                <span className="text-2xl font-bold text-primary">1</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Sign Up & Choose Subject</h3>
-              <p className="text-gray-400">Create your free account and select which GS subject or topic you want to tackle today.</p>
-            </div>
-            <div className="text-center relative">
-              <div className="hidden md:block absolute top-8 left-[-50%] w-full h-[1px] bg-white/10 -z-10"></div>
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary/20">
-                <span className="text-2xl font-bold text-primary">2</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Practice & Learn</h3>
-              <p className="text-gray-400">Attempt PYQs and new MCQs. Read detailed explanations for both correct and incorrect options.</p>
-            </div>
-            <div className="text-center relative">
-              <div className="hidden md:block absolute top-8 left-[-50%] w-full h-[1px] bg-white/10 -z-10"></div>
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-primary/20">
-                <span className="text-2xl font-bold text-primary">3</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Track & Improve</h3>
-              <p className="text-gray-400">Review your performance analytics to identify weak areas and boost your accuracy.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Pricing Teaser (Requested Section) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <h2 className="text-3xl md:text-4xl font-serif font-bold text-white text-center mb-16">
-          Choose Your Plan
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-8">
-            <h3 className="text-2xl font-bold text-white mb-2">Free</h3>
-            <p className="text-gray-400 mb-6">Perfect for testing the waters.</p>
-            <div className="text-4xl font-bold text-white mb-8">₹0</div>
-            <ul className="space-y-4 mb-8">
-              <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-primary mr-3" /> 100+ Free Practice MCQs</li>
-              <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-primary mr-3" /> 1 Full-Length Mock Test</li>
-              <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-primary mr-3" /> Basic Analytics</li>
-            </ul>
-            <Link href="/signup" className="block text-center w-full py-3 rounded-md bg-white/5 text-white font-semibold hover:bg-white/10 transition-colors">
-              Get Started
-            </Link>
-          </div>
-          <div className="bg-[#1a1a1a] border border-primary rounded-xl p-8 relative shadow-[0_0_30px_rgba(255,191,0,0.1)]">
-            <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-xl">POPULAR</div>
-            <h3 className="text-2xl font-bold text-white mb-2">Premium</h3>
-            <p className="text-gray-400 mb-6">Everything you need to crack Prelims.</p>
-            <div className="text-4xl font-bold text-white mb-8">₹999 <span className="text-lg text-gray-500 font-normal">/year</span></div>
-            <ul className="space-y-4 mb-8">
-              <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-primary mr-3" /> 10,000+ Topic-wise MCQs</li>
-              <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-primary mr-3" /> 50+ Full-Length Mock Tests</li>
-              <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-primary mr-3" /> Advanced Analytics</li>
-            </ul>
-            <Link href="/pricing" className="block text-center w-full py-3 rounded-md bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">
-              View All Features
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. FAQ Accordion (Requested Section) */}
-      <section className="bg-[#181818] py-20 border-t border-white/5">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-serif font-bold text-white text-center mb-12">
-            Frequently Asked Questions
-          </h2>
-          <div className="space-y-4">
-            <details className="group bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden">
-              <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-5 text-white">
-                <span>Are the mock tests updated for the latest UPSC pattern?</span>
-                <span className="transition group-open:rotate-180">
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                </span>
-              </summary>
-              <div className="text-gray-400 px-5 pb-5">
-                Yes, our content team regularly updates the question bank to reflect the latest trends, difficulty levels, and syllabus changes of the UPSC Civil Services Examination.
-              </div>
-            </details>
-            <details className="group bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden">
-              <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-5 text-white">
-                <span>Do I get detailed explanations for incorrect answers?</span>
-                <span className="transition group-open:rotate-180">
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                </span>
-              </summary>
-              <div className="text-gray-400 px-5 pb-5">
-                Absolutely. Every single question in our database comes with a comprehensive explanation, covering not just the correct option but also why the other options are incorrect.
-              </div>
-            </details>
-            <details className="group bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden">
-              <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-5 text-white">
-                <span>Can I practice on my mobile device?</span>
-                <span className="transition group-open:rotate-180">
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                </span>
-              </summary>
-              <div className="text-gray-400 px-5 pb-5">
-                Yes, Prepwise is fully responsive and optimized for mobile browsers, allowing you to practice MCQs on the go.
-              </div>
-            </details>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. Bottom CTA */}
-      <section className="bg-[#1a1a1a] py-20 text-center">
-        <div className="max-w-3xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-serif font-bold text-white mb-8">
-            Start practicing for free, no signup needed for first 5 questions
-          </h2>
-          <Link 
-            href="/test-interface" 
-            className="inline-block px-8 py-3.5 bg-primary text-primary-foreground font-semibold rounded-md hover:bg-primary/90 transition-colors"
-          >
-            Start Free Trial
-          </Link>
-        </div>
-      </section>
-
-      {/* 8. Footer */}
-      <footer className="bg-[#121212] border-t border-white/5 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="col-span-2 md:col-span-1">
-              <span className="font-serif font-bold text-xl text-white block mb-4">Prepwise</span>
-              <p className="text-sm text-gray-500 max-w-xs">
-                © 2024 Prepwise. Engineered for Excellence.
-              </p>
-            </div>
-            
-            <div>
-              <h4 className="text-xs font-bold text-primary tracking-widest uppercase mb-4">Product</h4>
-              <ul className="space-y-3">
-                <li><Link href="/practice-tests" className="text-sm text-gray-400 hover:text-white transition-colors">Practice Tests</Link></li>
-                <li><Link href="/mock-tests" className="text-sm text-gray-400 hover:text-white transition-colors">Mock Tests</Link></li>
-                <li><Link href="/performance" className="text-sm text-gray-400 hover:text-white transition-colors">Performance</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-xs font-bold text-primary tracking-widest uppercase mb-4">Support</h4>
-              <ul className="space-y-3">
-                <li><Link href="#" className="text-sm text-gray-400 hover:text-white transition-colors">Contact Us</Link></li>
-                <li><Link href="#" className="text-sm text-gray-400 hover:text-white transition-colors">Help Center</Link></li>
-                <li><Link href="#" className="text-sm text-gray-400 hover:text-white transition-colors">FAQ</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-xs font-bold text-primary tracking-widest uppercase mb-4">Legal</h4>
-              <ul className="space-y-3">
-                <li><Link href="#" className="text-sm text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
-                <li><Link href="#" className="text-sm text-gray-400 hover:text-white transition-colors">Terms of Service</Link></li>
-                <li><Link href="#" className="text-sm text-gray-400 hover:text-white transition-colors">Cookie Policy</Link></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }
 
-function FeatureCard({ icon, title, description, amberStyle = false }: { icon: React.ReactNode, title: string, description: string, amberStyle?: boolean }) {
+function HeroTestSimulation() {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const sequence = [
+      { step: 1, delay: 600 },
+      { step: 2, delay: 1200 },
+      { step: 3, delay: 1500 },
+      { step: 4, delay: 1800 },
+      { step: 5, delay: 2100 },
+      { step: 6, delay: 3500 }, 
+      { step: 0, delay: 6000 }  
+    ];
+
+    let timeouts: NodeJS.Timeout[] = [];
+    
+    const runSequence = () => {
+      setStep(0);
+      timeouts.forEach(clearTimeout);
+      timeouts = sequence.map(s => 
+        setTimeout(() => setStep(s.step), s.delay)
+      );
+    };
+
+    runSequence();
+    const interval = setInterval(runSequence, 6500);
+
+    return () => {
+      clearInterval(interval);
+      timeouts.forEach(clearTimeout);
+    };
+  }, []);
+
+  const options = [
+    "Article 14",
+    "Article 19",
+    "Article 21",
+    "Article 32"
+  ];
+
   return (
-    <div className={`p-6 rounded-lg border transition-colors relative ${amberStyle ? 'bg-[#1a1a1a] border-amber-500/30 hover:border-amber-500/50 shadow-[0_0_15px_rgba(255,191,0,0.05)]' : 'bg-[#1a1a1a] border-white/5 hover:border-white/10'}`}>
+    <div className="relative w-full max-w-md mx-auto p-6 bg-[#1a1a1a]/80 backdrop-blur-xl border border-white/5 rounded-2xl shadow-2xl overflow-hidden group hover:border-white/10 transition-colors duration-500">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/5">
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 rounded-full bg-red-500/80 animate-pulse" />
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Live Preview</span>
+        </div>
+        <span className="text-xs font-medium text-gray-500 flex items-center"><Clock className="w-3 h-3 mr-1" /> 00:45</span>
+      </div>
+
+      <div className={`min-h-[60px] transition-all duration-500 ease-out ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <p className="font-bold text-white leading-relaxed text-lg tracking-tight">
+          Which of the following Fundamental Rights protects a citizen&apos;s right to life and personal liberty?
+        </p>
+      </div>
+
+      <div className="mt-6 space-y-3">
+        {options.map((opt, idx) => (
+          <div 
+            key={idx}
+            className={`
+              p-4 rounded-xl border flex items-center transition-all duration-300 ease-out
+              ${step >= idx + 2 ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}
+              ${step === 6 && idx === 2 ? 'bg-primary/10 border-primary/40 text-primary scale-[1.02]' : 'bg-[#121212] border-white/5 text-gray-300'}
+            `}
+          >
+            <div className={`w-7 h-7 rounded-full border flex items-center justify-center mr-4 text-xs font-bold transition-colors
+              ${step === 6 && idx === 2 ? 'border-primary bg-primary text-[#121212]' : 'border-white/20 text-gray-500 bg-white/5'}
+            `}>
+              {String.fromCharCode(65 + idx)}
+            </div>
+            <span className="font-medium">{opt}</span>
+            
+            {step === 6 && idx === 2 && (
+              <CheckCircle2 className="w-5 h-5 ml-auto text-primary animate-[scaleIn_0.3s_ease-out]" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title, description, amberStyle = false, delay = 0, isVisible = false }: { icon: React.ReactNode, title: string, description: string, amberStyle?: boolean, delay?: number, isVisible?: boolean }) {
+  return (
+    <div 
+      className={`
+        p-8 rounded-2xl transition-all duration-700 ease-out group relative overflow-hidden
+        ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}
+        ${amberStyle 
+          ? 'bg-[#1a1a1a] border border-primary/20 hover:border-primary/50 shadow-[0_0_20px_rgba(255,191,0,0.03)] hover:shadow-[0_0_30px_rgba(255,191,0,0.1)] hover:-translate-y-1 z-10' 
+          : 'bg-[#1a1a1a] border border-white/5 hover:border-white/10 hover:bg-white/[0.02] hover:-translate-y-1'}
+      `}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
       {amberStyle && (
-        <span className="absolute top-4 right-4 bg-amber-500/10 text-amber-500 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+        <span className="absolute top-5 right-5 bg-primary/10 text-primary text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
           Only on Prepwise
         </span>
       )}
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${amberStyle ? 'bg-amber-500/10 text-amber-500' : 'bg-[#222]'}`}>
+      
+      <div className={`
+        w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-all duration-700
+        ${isVisible ? 'scale-100 rotate-0' : 'scale-0 -rotate-45'}
+        ${amberStyle ? 'bg-primary/10 text-primary group-hover:shadow-[0_0_15px_rgba(255,191,0,0.4)]' : 'bg-[#222] text-gray-300 group-hover:text-white'}
+      `} style={{ transitionDelay: `${delay + 200}ms` }}>
         {icon}
       </div>
-      <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
-      <p className="text-sm text-gray-400">
+      
+      <h3 className="text-xl font-bold text-white mb-3 tracking-tight">{title}</h3>
+      <p className="text-gray-400 leading-relaxed">
         {description}
       </p>
+    </div>
+  );
+}
+
+// --- MAIN PAGE ---
+
+export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+  
+  const { ref: featuresRef, isVisible: featuresVisible } = useScrollReveal(0.1);
+  const { ref: stepsRef, progress: stepsProgress } = useScrollProgress();
+  const { ref: pricingRef, isVisible: pricingVisible } = useScrollReveal(0.2);
+
+  return (
+    <div className="min-h-screen bg-[#121212] text-white selection:bg-primary/30 selection:text-white overflow-hidden">
+      
+      {/* Background Ambient Glow */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary/5 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-primary/5 blur-[120px] rounded-full" />
+      </div>
+
+      <div className="relative z-10">
+        
+        {/* 1. HERO SECTION */}
+        <section className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col lg:flex-row items-center min-h-[90vh]">
+          <div className="flex-1 text-center lg:text-left z-10">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-[1.1]">
+               <div className={`transition-all duration-700 ease-out delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>Master UPSC Prelims</div>
+               <div className={`transition-all duration-700 ease-out delay-200 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>with <span className="text-primary">PYQ-Based</span></div>
+               <div className={`transition-all duration-700 ease-out delay-300 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>Mock Tests</div>
+            </h1>
+            <p className={`text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto lg:mx-0 transition-all duration-700 ease-out delay-400 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              Stop wasting time on irrelevant questions. Practice what matters with our curated database of UPSC Previous Year Questions and high-probability mocks.
+            </p>
+            
+            <div className={`flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 transition-all duration-700 ease-out delay-500 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <Link 
+                href="/signup" 
+                className="group relative px-8 py-4 bg-primary text-[#121212] font-bold rounded-xl shadow-[0_0_20px_rgba(255,191,0,0.2)] hover:shadow-[0_0_30px_rgba(255,191,0,0.4)] transition-all duration-300 hover:scale-[0.98] active:scale-95 flex items-center w-full sm:w-auto justify-center"
+              >
+                Start Free Test
+                <ChevronRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link 
+                href="#how-it-works" 
+                className="px-8 py-4 bg-transparent text-white border border-white/10 font-medium rounded-xl hover:bg-white/5 transition-all duration-300 w-full sm:w-auto text-center"
+              >
+                How it works
+              </Link>
+            </div>
+
+            {/* Stats */}
+            <div className={`mt-16 grid grid-cols-3 gap-6 pt-10 border-t border-white/5 transition-all duration-700 ease-out delay-700 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div>
+                <div className="text-3xl font-bold text-white mb-1"><CountUp end={885} suffix="+" /></div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">PYQ MCQs</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-white mb-1"><CountUp end={50} suffix="+" /></div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">Mock Tests</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-white mb-1"><CountUp end={5000} suffix="+" /></div>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">Active Students</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className={`flex-1 w-full mt-16 lg:mt-0 lg:ml-12 transition-all duration-1000 ease-out delay-500 ${isMounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'}`}>
+            <HeroTestSimulation />
+          </div>
+        </section>
+
+        {/* 2. FEATURES SECTION */}
+        <section className="py-32 bg-[#181818] border-y border-white/5" ref={featuresRef}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className={`text-center max-w-3xl mx-auto mb-20 transition-all duration-700 ease-out ${featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Everything You Need to Crack Prelims</h2>
+              <p className="text-lg text-gray-400">Our platform is designed specifically for UPSC aspirants, focusing on active recall and pattern recognition.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <FeatureCard 
+                isVisible={featuresVisible} delay={100} amberStyle
+                icon={<BookOpen className="w-6 h-6" />}
+                title="Strictly PYQ-Based"
+                description="We don't waste your time with random trivia. Every question is mapped to previous year UPSC trends and difficulty levels."
+              />
+              <FeatureCard 
+                isVisible={featuresVisible} delay={200} amberStyle
+                icon={<Brain className="w-6 h-6" />}
+                title="AI Analytics Engine"
+                description="Our system identifies your weak subjects and specific topics, generating custom tests to target those exact vulnerabilities."
+              />
+              <FeatureCard 
+                isVisible={featuresVisible} delay={300} amberStyle
+                icon={<Target className="w-6 h-6" />}
+                title="Strict Syllabus Adherence"
+                description="Questions strictly bounded by the UPSC syllabus. If it's out of syllabus, it's out of our question bank."
+              />
+              <FeatureCard 
+                isVisible={featuresVisible} delay={400}
+                icon={<Clock className="w-6 h-6" />}
+                title="Real Exam Interface"
+                description="Practice in an environment that simulates the actual UPSC online test interface to build muscle memory."
+              />
+              <FeatureCard 
+                isVisible={featuresVisible} delay={500}
+                icon={<ShieldCheck className="w-6 h-6" />}
+                title="Error-Free Explanations"
+                description="Detailed, verified explanations for every option, backed by standard UPSC reference books."
+              />
+              <FeatureCard 
+                isVisible={featuresVisible} delay={600}
+                icon={<Zap className="w-6 h-6" />}
+                title="Spaced Repetition"
+                description="Algorithmically scheduled revisions ensure you never forget what you've learned."
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* 3. HOW IT WORKS */}
+        <section id="how-it-works" className="py-32" ref={stepsRef}>
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            
+            <div className="text-center mb-20">
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white">How It Works</h2>
+            </div>
+
+            {/* Scroll Line Indicator */}
+            <div className="absolute left-8 md:left-1/2 top-[200px] bottom-10 w-px bg-white/5 md:-translate-x-1/2" />
+            <div 
+              className="absolute left-8 md:left-1/2 top-[200px] w-[2px] bg-primary md:-translate-x-1/2 transition-all duration-300 ease-out shadow-[0_0_15px_rgba(255,191,0,0.5)] z-0 rounded-full"
+              style={{ height: `${stepsProgress * 100}%` }}
+            />
+
+            <div className="space-y-24 relative z-10">
+              {/* Step 1 */}
+              <div className={`flex flex-col md:flex-row items-start md:items-center gap-8 md:gap-16 transition-all duration-700 ease-out ${stepsProgress > 0.05 ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-8'}`}>
+                <div className="md:w-1/2 flex justify-start md:justify-end order-2 md:order-1 pl-16 md:pl-0">
+                  <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-white/5 max-w-sm w-full shadow-xl">
+                    <h3 className="text-xl font-bold text-white mb-2">1. Take a Diagnostic</h3>
+                    <p className="text-gray-400">Start with a full-length PYQ test. Our engine maps your baseline across 40+ micro-topics.</p>
+                  </div>
+                </div>
+                <div className="absolute left-4 md:left-1/2 w-8 h-8 md:-translate-x-1/2 bg-[#121212] border-4 border-[#1a1a1a] rounded-full flex items-center justify-center z-10 transition-colors duration-500 overflow-hidden">
+                  <div className={`w-full h-full bg-primary transition-all duration-500 ${stepsProgress > 0.05 ? 'scale-100' : 'scale-0'}`} />
+                </div>
+                <div className="md:w-1/2 order-3 pl-16 md:pl-0" />
+              </div>
+
+              {/* Step 2 */}
+              <div className={`flex flex-col md:flex-row items-start md:items-center gap-8 md:gap-16 transition-all duration-700 ease-out ${stepsProgress > 0.4 ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-8'}`}>
+                <div className="md:w-1/2 order-2 md:order-1 pl-16 md:pl-0" />
+                <div className="absolute left-4 md:left-1/2 w-8 h-8 md:-translate-x-1/2 bg-[#121212] border-4 border-[#1a1a1a] rounded-full flex items-center justify-center z-10 transition-colors duration-500 overflow-hidden">
+                  <div className={`w-full h-full bg-primary transition-all duration-500 ${stepsProgress > 0.4 ? 'scale-100' : 'scale-0'}`} />
+                </div>
+                <div className="md:w-1/2 flex justify-start order-3 pl-16 md:pl-0">
+                  <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-white/5 max-w-sm w-full shadow-xl">
+                    <h3 className="text-xl font-bold text-white mb-2">2. Review Analytics</h3>
+                    <p className="text-gray-400">See exactly where you lose marks. History? Geography? We show you the data.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className={`flex flex-col md:flex-row items-start md:items-center gap-8 md:gap-16 transition-all duration-700 ease-out ${stepsProgress > 0.75 ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-8'}`}>
+                <div className="md:w-1/2 flex justify-start md:justify-end order-2 md:order-1 pl-16 md:pl-0">
+                  <div className="bg-[#1a1a1a] p-8 rounded-2xl border border-white/5 max-w-sm w-full shadow-xl">
+                    <h3 className="text-xl font-bold text-white mb-2">3. Targeted Practice</h3>
+                    <p className="text-gray-400">Practice custom test sets generated specifically to fix your weak areas before the real exam.</p>
+                  </div>
+                </div>
+                <div className="absolute left-4 md:left-1/2 w-8 h-8 md:-translate-x-1/2 bg-[#121212] border-4 border-[#1a1a1a] rounded-full flex items-center justify-center z-10 transition-colors duration-500 overflow-hidden">
+                  <div className={`w-full h-full bg-primary transition-all duration-500 ${stepsProgress > 0.75 ? 'scale-100' : 'scale-0'}`} />
+                </div>
+                <div className="md:w-1/2 order-3 pl-16 md:pl-0" />
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        {/* 4. PRICING SECTION */}
+        <section className="py-32 bg-[#181818] border-y border-white/5" ref={pricingRef}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className={`text-center mb-20 transition-all duration-700 ease-out ${pricingVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Simple, Transparent Pricing</h2>
+              <p className="text-lg text-gray-400">Start for free, upgrade when you need full access.</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto items-center">
+              {/* Free Tier */}
+              <div className={`bg-[#121212] border border-white/5 rounded-2xl p-8 md:p-10 transition-all duration-700 ease-out delay-100 ${pricingVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
+                <h3 className="text-2xl font-bold text-white mb-2">Free</h3>
+                <p className="text-gray-400 mb-8 h-12">Perfect for getting a feel of our platform.</p>
+                <div className="text-5xl font-bold text-white mb-8">₹0 <span className="text-lg text-gray-500 font-normal">/forever</span></div>
+                <ul className="space-y-5 mb-10">
+                  <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-gray-500 mr-3 flex-shrink-0" /> 1 Full-Length Mock Test</li>
+                  <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-gray-500 mr-3 flex-shrink-0" /> 100 PYQ MCQs</li>
+                  <li className="flex items-center text-gray-300"><CheckCircle2 className="w-5 h-5 text-gray-500 mr-3 flex-shrink-0" /> Basic Analytics</li>
+                </ul>
+                <Link href="/signup" className="block text-center w-full py-4 rounded-xl border border-white/10 text-white font-bold hover:bg-white/5 transition-colors">
+                  Get Started
+                </Link>
+              </div>
+
+              {/* Premium Tier */}
+              <div className={`bg-[#1a1a1a] border border-primary/30 rounded-2xl p-8 md:p-12 relative shadow-[0_0_40px_rgba(255,191,0,0.05)] md:scale-105 z-10 transition-all duration-700 ease-out delay-300 ${pricingVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-[#121212] text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider animate-pulse shadow-[0_0_15px_rgba(255,191,0,0.5)]">
+                  POPULAR
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Premium</h3>
+                <p className="text-gray-400 mb-8 h-12">Everything you need to crack Prelims.</p>
+                <div className="text-5xl font-bold text-white mb-8">₹999 <span className="text-lg text-gray-500 font-normal">/year</span></div>
+                <ul className="space-y-5 mb-10">
+                  <li className="flex items-center text-white"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> 10,000+ Topic-wise MCQs</li>
+                  <li className="flex items-center text-white"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> 50+ Full-Length Mock Tests</li>
+                  <li className="flex items-center text-white"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Advanced AI Analytics Engine</li>
+                </ul>
+                <Link href="/pricing" className="block text-center w-full py-4 rounded-xl bg-primary text-[#121212] font-bold hover:bg-primary/90 transition-transform active:scale-95 shadow-[0_0_20px_rgba(255,191,0,0.2)]">
+                  View All Features
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 5. FAQ SECTION */}
+        <section className="py-32">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-6">Frequently Asked Questions</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <FAQItem 
+                delay={100}
+                question="Are the mock tests updated for the latest UPSC pattern?"
+                answer="Yes, our content team regularly updates the question bank to reflect the latest trends, difficulty levels, and syllabus changes of the UPSC Civil Services Examination."
+              />
+              <FAQItem 
+                delay={200}
+                question="Do I get detailed explanations for incorrect answers?"
+                answer="Absolutely. Every single question in our database comes with a comprehensive explanation, covering not just the correct option but also why the other options are incorrect."
+              />
+              <FAQItem 
+                delay={300}
+                question="Can I practice on my mobile device?"
+                answer="Yes, Prepwise is fully responsive and optimized for mobile browsers, allowing you to practice MCQs on the go without downloading a separate app."
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* 6. BOTTOM CTA */}
+        <section className="py-24 border-t border-white/5 bg-[#181818]">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-8 leading-tight">
+              Ready to elevate your <br/> Prelims preparation?
+            </h2>
+            <Link 
+              href="/signup" 
+              className="inline-flex items-center justify-center px-10 py-5 bg-primary text-[#121212] font-bold rounded-xl shadow-[0_0_30px_rgba(255,191,0,0.2)] hover:shadow-[0_0_40px_rgba(255,191,0,0.4)] transition-all duration-300 hover:scale-[0.98] active:scale-95 text-lg group"
+            >
+              Start Free Trial
+              <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <p className="mt-6 text-sm font-medium text-gray-500 uppercase tracking-widest">No credit card required</p>
+          </div>
+        </section>
+
+        {/* 7. FOOTER */}
+        <footer className="bg-[#121212] border-t border-white/5 py-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="col-span-2 md:col-span-1">
+                <span className="font-bold text-2xl tracking-tight text-white block mb-4">Prepwise</span>
+                <p className="text-sm text-gray-500 max-w-xs">
+                  © 2024 Prepwise. Engineered for Excellence.
+                </p>
+              </div>
+              
+              <div>
+                <h4 className="text-xs font-bold text-primary tracking-widest uppercase mb-4">Product</h4>
+                <ul className="space-y-3">
+                  <li><Link href="/practice-tests" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Practice Tests</Link></li>
+                  <li><Link href="/mock-tests" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Mock Tests</Link></li>
+                  <li><Link href="/performance" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Performance</Link></li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-primary tracking-widest uppercase mb-4">Support</h4>
+                <ul className="space-y-3">
+                  <li><Link href="#" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Contact Us</Link></li>
+                  <li><Link href="#" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Help Center</Link></li>
+                  <li><Link href="#" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">FAQ</Link></li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-primary tracking-widest uppercase mb-4">Legal</h4>
+                <ul className="space-y-3">
+                  <li><Link href="#" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
+                  <li><Link href="#" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Terms of Service</Link></li>
+                  <li><Link href="#" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Cookie Policy</Link></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
