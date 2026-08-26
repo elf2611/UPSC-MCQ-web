@@ -13,7 +13,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signup, signInWithGoogle } = useAuth();
+  const { signUpWithEmail: signup, signInWithGoogle } = useAuth();
   const router = useRouter();
 
   const handleEmailSignup = async (e: React.FormEvent) => {

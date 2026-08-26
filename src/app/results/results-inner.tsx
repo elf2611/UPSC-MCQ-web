@@ -9,7 +9,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
 } from "recharts";
 import { XCircle } from "lucide-react";
-import { ProtectedRoute } from "@/components/protected-route";
 import React from "react";
 import Link from "next/link";
 

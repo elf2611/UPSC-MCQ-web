@@ -4,7 +4,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { 
-  Inbox, Activity, CheckCircle2, XCircle, Search, 
+  Inbox, Calendar, Activity, CheckCircle2, XCircle, Search, 
   Filter, Play, Archive, BrainCircuit, Loader2, ArrowRight
 } from "lucide-react";
 import Link from "next/link";

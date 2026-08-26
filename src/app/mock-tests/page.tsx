@@ -269,15 +269,6 @@ export default function MockTestsPage() {
         )}
 
                 className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg font-bold hover:bg-primary/90 transition-colors shadow-surface-glow hover:scale-[0.98] active:scale-95 ease-snappy whitespace-nowrap"
-              >
-                Start Test Now <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-        )}
-
-        {/* Tabs */}
         <div className="flex items-center border-b border-white/10 mb-8">
           {(["full", "sectional"] as const).map(tab => (
             <button

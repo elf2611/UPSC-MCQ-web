@@ -335,11 +335,9 @@ export default function PerformancePage() {
           </div>
 
         </div>
-        </div>
 
         {/* Analytics Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          
           {/* Weak Topics Section */}
           <div className="bg-card shadow-surface rounded-2xl p-6 flex flex-col">
             <h3 className="text-foreground font-display font-bold text-lg flex items-center gap-2 mb-6">
