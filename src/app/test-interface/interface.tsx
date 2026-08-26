@@ -583,6 +583,7 @@ export default function TestInterfaceInner() {
                     if (showAsCorrect) btnStyle = "bg-green-500/20 border-green-500 text-foreground";
                     else if (showAsWrong) btnStyle = "bg-red-500/20 border-red-500 text-foreground";
                     else btnStyle = "bg-card border-white/5 text-muted-foreground/70 opacity-70";
+                  }
                   return (
                     <button
                       key={opt}
