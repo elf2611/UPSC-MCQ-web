@@ -2,7 +2,7 @@
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect } from "react";
-import { Plus, Clock, AlertTriangle, CheckCircle2, CircleDot, Users, ChevronRight, X } from "lucide-react";
+import { Plus, AlertTriangle, CheckCircle2, CircleDot, Users, ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 
@@ -268,7 +268,6 @@ export default function MockTestsPage() {
         </div>
         )}
 
-                className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg font-bold hover:bg-primary/90 transition-colors shadow-surface-glow hover:scale-[0.98] active:scale-95 ease-snappy whitespace-nowrap"
         <div className="flex items-center border-b border-white/10 mb-8">
           {(["full", "sectional"] as const).map(tab => (
             <button

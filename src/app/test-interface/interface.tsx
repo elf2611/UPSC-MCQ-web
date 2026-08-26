@@ -575,14 +575,14 @@ export default function TestInterfaceInner() {
                   const showAsCorrect = feedbackMode && opt === currentQ.correct_option;
                   const showAsWrong = feedbackMode && isSelected && !isCorrect;
 
-                  let btnStyle = isSelected
+                  let _btnStyle = isSelected
                     ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(255,191,0,0.08)] text-foreground"
                     : "bg-background shadow-surface text-muted-foreground hover:border-primary/50 hover:shadow-surface-hover hover:text-foreground";
                   
                   if (feedbackMode) {
-                    if (showAsCorrect) btnStyle = "bg-green-500/20 border-green-500 text-foreground";
-                    else if (showAsWrong) btnStyle = "bg-red-500/20 border-red-500 text-foreground";
-                    else btnStyle = "bg-card border-white/5 text-muted-foreground/70 opacity-70";
+                    if (showAsCorrect) _btnStyle = "bg-green-500/20 border-green-500 text-foreground";
+                    else if (showAsWrong) _btnStyle = "bg-red-500/20 border-red-500 text-foreground";
+                    else _btnStyle = "bg-card border-white/5 text-muted-foreground/70 opacity-70";
                   }
                   return (
                     <button

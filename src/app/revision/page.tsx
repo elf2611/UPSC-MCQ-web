@@ -1,11 +1,10 @@
 "use client";
 
 import { ProtectedRoute } from "@/components/protected-route";
-import { useState, useEffect, useMemo } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
 import { 
-  Inbox, Calendar, Activity, CheckCircle2, XCircle, Search, 
-  Filter, Play, Archive, BrainCircuit, Loader2, ArrowRight
+  Inbox, Calendar, CheckCircle2, XCircle, Search, 
+  Filter, Play, BrainCircuit, Loader2, ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,7 +18,6 @@ interface QueuedItem {
 }
 
 export default function RevisionInboxPage() {
-  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [queue, setQueue] = useState<QueuedItem[]>([]);
   const router = useRouter();

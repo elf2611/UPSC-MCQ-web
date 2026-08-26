@@ -11,8 +11,7 @@ import {
   Zap, 
   Target, 
   CheckCircle2, 
-  ChevronRight, 
-  BarChart3,
+  ChevronRight,
   ArrowRight
 } from 'lucide-react';
 

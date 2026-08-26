@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { Calendar, ChevronRight, Newspaper, ArrowRight, Loader2, Sparkles, BookOpen } from "lucide-react";
+import { Newspaper, Loader2, Sparkles, BookOpen } from "lucide-react";
 import Link from "next/link";
 
 interface DateInfo {
@@ -85,7 +85,7 @@ export default function CurrentAffairsPage() {
           <BookOpen className="w-12 h-12 text-muted-foreground/50 mx-auto mb-6" />
           <h2 className="text-2xl font-display font-bold text-foreground mb-3">Feed Empty</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Our AI is currently scouring the news. Check back later for today's curated feed.
+            Our AI is currently scouring the news. Check back later for today&apos;s curated feed.
           </p>
         </div>
       ) : (
