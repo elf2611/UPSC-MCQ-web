@@ -106,7 +106,7 @@ export function ReviewTab() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-400">Loading staged questions...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Loading staged questions...</div>;
   }
 
   if (errorMsg) {
@@ -115,7 +115,7 @@ export function ReviewTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-card p-4 rounded-xl border border-white/10">
+      <div className="flex justify-between items-center bg-card p-4 rounded-xl shadow-border">
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -124,7 +124,7 @@ export function ReviewTab() {
               onChange={toggleSelectAll}
               className="w-4 h-4 rounded border-gray-600 bg-background text-primary focus:ring-primary"
             />
-            <span className="text-sm text-gray-300">Select All ({selectedIds.size})</span>
+            <span className="text-sm text-muted-foreground">Select All ({selectedIds.size})</span>
           </label>
         </div>
         <div className="flex gap-3">
@@ -146,7 +146,7 @@ export function ReviewTab() {
       </div>
 
       {questions.length === 0 ? (
-        <div className="p-12 text-center bg-card border border-white/10 rounded-xl text-gray-400">
+        <div className="p-12 text-center bg-card shadow-border rounded-xl text-muted-foreground">
           No pending questions to review.
         </div>
       ) : (
@@ -156,7 +156,7 @@ export function ReviewTab() {
             const data = isEditing && editFormData ? editFormData : q;
 
             return (
-              <div key={q.id} className="bg-card border border-white/10 rounded-xl p-5 flex gap-4 transition-colors hover:bg-white/[0.02]">
+              <div key={q.id} className="bg-card shadow-border rounded-xl p-5 flex gap-4 transition-colors hover:bg-white/[0.02]">
                 <div className="pt-1">
                   <input
                     type="checkbox"
@@ -171,7 +171,7 @@ export function ReviewTab() {
                       <textarea
                         value={data.question_text}
                         onChange={(e) => setEditFormData({ ...data, question_text: e.target.value })}
-                        className="w-full bg-background border border-white/10 rounded-lg p-3 text-white"
+                        className="w-full bg-background shadow-border rounded-lg p-3 text-foreground"
                         rows={3}
                       />
                       <div className="grid grid-cols-2 gap-4">
@@ -184,12 +184,12 @@ export function ReviewTab() {
                                 checked={data.correct_option === opt}
                                 onChange={() => setEditFormData({ ...data, correct_option: opt })}
                               />
-                              <span className="text-xs uppercase font-bold text-gray-400">Option {opt}</span>
+                              <span className="text-xs uppercase font-bold text-muted-foreground">Option {opt}</span>
                             </div>
                             <textarea
                               value={data[`option_${opt}`]}
                               onChange={(e) => setEditFormData({ ...data, [`option_${opt}`]: e.target.value })}
-                              className="w-full bg-background/50 border border-white/10 rounded p-1 text-sm text-white"
+                              className="w-full bg-background/50 shadow-border rounded p-1 text-sm text-foreground"
                               rows={2}
                             />
                             {data.correct_option !== opt && (
@@ -198,30 +198,30 @@ export function ReviewTab() {
                                 placeholder={`Why is ${opt} wrong?`}
                                 value={data[`why_${opt}_wrong`] || ''}
                                 onChange={(e) => setEditFormData({ ...data, [`why_${opt}_wrong`]: e.target.value })}
-                                className="w-full mt-1 bg-background/50 border border-white/10 rounded p-1 text-xs text-gray-400"
+                                className="w-full mt-1 bg-background/50 shadow-border rounded p-1 text-xs text-muted-foreground"
                               />
                             )}
                           </div>
                         ))}
                       </div>
                       <div>
-                        <span className="text-xs text-gray-400 block mb-1">Explanation</span>
+                        <span className="text-xs text-muted-foreground block mb-1">Explanation</span>
                         <textarea
                           value={data.explanation}
                           onChange={(e) => setEditFormData({ ...data, explanation: e.target.value })}
-                          className="w-full bg-background border border-white/10 rounded-lg p-3 text-sm text-gray-300"
+                          className="w-full bg-background shadow-border rounded-lg p-3 text-sm text-muted-foreground"
                           rows={3}
                         />
                       </div>
                       <div className="flex gap-2">
-                         <input type="text" value={data.subject || ''} onChange={e => setEditFormData({...data, subject: e.target.value})} placeholder="Subject" className="bg-background border border-white/10 rounded p-1 text-sm text-white" />
-                         <input type="text" value={data.topic || ''} onChange={e => setEditFormData({...data, topic: e.target.value})} placeholder="Topic" className="bg-background border border-white/10 rounded p-1 text-sm text-white" />
-                         <input type="text" value={data.subtopic || ''} onChange={e => setEditFormData({...data, subtopic: e.target.value})} placeholder="Subtopic" className="bg-background border border-white/10 rounded p-1 text-sm text-white" />
-                         <input type="date" value={data.article_date || ''} onChange={e => setEditFormData({...data, article_date: e.target.value})} className="bg-background border border-white/10 rounded p-1 text-sm text-gray-400" />
+                         <input type="text" value={data.subject || ''} onChange={e => setEditFormData({...data, subject: e.target.value})} placeholder="Subject" className="bg-background shadow-border rounded p-1 text-sm text-foreground" />
+                         <input type="text" value={data.topic || ''} onChange={e => setEditFormData({...data, topic: e.target.value})} placeholder="Topic" className="bg-background shadow-border rounded p-1 text-sm text-foreground" />
+                         <input type="text" value={data.subtopic || ''} onChange={e => setEditFormData({...data, subtopic: e.target.value})} placeholder="Subtopic" className="bg-background shadow-border rounded p-1 text-sm text-foreground" />
+                         <input type="date" value={data.article_date || ''} onChange={e => setEditFormData({...data, article_date: e.target.value})} className="bg-background shadow-border rounded p-1 text-sm text-muted-foreground" />
                       </div>
                       <div className="flex justify-end gap-3 pt-2">
-                        <button onClick={() => setEditingId(null)} className="px-4 py-1.5 text-sm text-gray-400 hover:text-white">Cancel</button>
-                        <button onClick={() => handleApprove([q.id], data)} className="px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded text-sm flex items-center gap-2">
+                        <button onClick={() => setEditingId(null)} className="px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancel</button>
+                        <button onClick={() => handleApprove([q.id], data)} className="px-4 py-1.5 bg-green-600 hover:bg-green-500 text-foreground rounded text-sm flex items-center gap-2">
                           <Check className="w-4 h-4" /> Save & Approve
                         </button>
                       </div>
@@ -230,21 +230,21 @@ export function ReviewTab() {
                     <>
                       <div className="flex justify-between items-start gap-4">
                         <div>
-                          <p className="text-lg text-gray-200 mb-2">{q.question_text}</p>
+                          <p className="text-lg text-foreground mb-2">{q.question_text}</p>
                           <div className="flex gap-2 text-xs mb-4">
-                            <span className="px-2 py-1 bg-white/5 rounded text-gray-400">{q.subject} {q.topic ? `› ${q.topic}` : ''} {q.subtopic ? `› ${q.subtopic}` : ''}</span>
-                            <span className="px-2 py-1 bg-white/5 rounded text-gray-400">Source: {q.source} {q.article_date && `(${q.article_date})`}</span>
-                            <span className="px-2 py-1 bg-white/5 rounded text-gray-400">Diff: {q.difficulty}</span>
+                            <span className="px-2 py-1 bg-secondary rounded text-muted-foreground">{q.subject} {q.topic ? `› ${q.topic}` : ''} {q.subtopic ? `› ${q.subtopic}` : ''}</span>
+                            <span className="px-2 py-1 bg-secondary rounded text-muted-foreground">Source: {q.source} {q.article_date && `(${q.article_date})`}</span>
+                            <span className="px-2 py-1 bg-secondary rounded text-muted-foreground">Diff: {q.difficulty}</span>
                           </div>
                         </div>
                         <div className="flex flex-col gap-2 shrink-0">
-                          <button onClick={() => handleApprove([q.id])} disabled={processing} className="px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded text-xs flex items-center justify-center gap-1 transition-colors">
+                          <button onClick={() => handleApprove([q.id])} disabled={processing} className="px-3 py-2 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-green-950 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors focus-visible:ring-2 focus-visible:ring-green-400 focus-visible:outline-none">
                             <Check className="w-3 h-3" /> Approve
                           </button>
-                          <button onClick={() => { setEditingId(q.id); setEditFormData(q); }} disabled={processing} className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded text-xs flex items-center justify-center gap-1 transition-colors">
+                          <button onClick={() => { setEditingId(q.id); setEditFormData(q); }} disabled={processing} className="px-3 py-2 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 bg-secondary shadow-surface hover:shadow-surface-hover text-muted-foreground rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none">
                             <Pencil className="w-3 h-3" /> Edit
                           </button>
-                          <button onClick={() => handleReject([q.id])} disabled={processing} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-xs flex items-center justify-center gap-1 transition-colors">
+                          <button onClick={() => handleReject([q.id])} disabled={processing} className="px-3 py-2 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-red-950 rounded text-xs font-bold flex items-center justify-center gap-1 transition-colors focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none">
                             <X className="w-3 h-3" /> Reject
                           </button>
                         </div>
@@ -255,10 +255,10 @@ export function ReviewTab() {
                           const isCorrect = q.correct_option?.toLowerCase() === opt;
                           return (
                             <div key={opt} className={`p-2 rounded border ${isCorrect ? 'border-green-500/30 bg-green-500/5' : 'border-white/5 bg-white/[0.02]'}`}>
-                              <span className={`font-bold mr-2 ${isCorrect ? 'text-green-400' : 'text-gray-500'}`}>{opt.toUpperCase()}.</span>
-                              <span className="text-gray-300">{q[`option_${opt}`]}</span>
+                              <span className={`font-bold mr-2 ${isCorrect ? 'text-green-400' : 'text-muted-foreground/70'}`}>{opt.toUpperCase()}.</span>
+                              <span className="text-muted-foreground">{q[`option_${opt}`]}</span>
                               {!isCorrect && q[`why_${opt}_wrong`] && (
-                                <p className="text-xs text-gray-500 mt-1 italic">{q[`why_${opt}_wrong`]}</p>
+                                <p className="text-xs text-muted-foreground/70 mt-1 italic">{q[`why_${opt}_wrong`]}</p>
                               )}
                             </div>
                           );
@@ -266,9 +266,9 @@ export function ReviewTab() {
                       </div>
 
                       {q.explanation && (
-                        <div className="mt-3 p-3 bg-white/5 rounded-lg border border-white/5">
-                          <span className="text-xs font-bold text-gray-400 uppercase mb-1 block">Explanation</span>
-                          <p className="text-sm text-gray-300">{q.explanation}</p>
+                        <div className="mt-3 p-3 bg-secondary rounded-lg shadow-surface">
+                          <span className="text-xs font-bold text-muted-foreground uppercase mb-1 block">Explanation</span>
+                          <p className="text-sm text-muted-foreground">{q.explanation}</p>
                         </div>
                       )}
                     </>

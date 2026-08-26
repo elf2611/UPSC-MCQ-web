@@ -28,15 +28,15 @@ function StartModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+      <div className="bg-card shadow-surface rounded-2xl p-8 w-full max-w-md shadow-2xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">Start {subjectName} PYQs</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+          <h2 className="text-xl font-display font-bold text-foreground">Start {subjectName} PYQs</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="mb-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+        <div className="mb-2 p-3 bg-amber-500/10  rounded-lg flex items-start gap-2">
           <Trophy className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-amber-300">
             Previous Year Questions — UPSC-style negative marking applies (−⅓ per wrong answer)
@@ -44,7 +44,7 @@ function StartModal({
         </div>
 
         <div className="mt-6 mb-8">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Question Count
           </h3>
           <div className="grid grid-cols-4 gap-2">
@@ -55,7 +55,7 @@ function StartModal({
                 className={`py-2 rounded-lg text-sm font-bold border transition-colors ${
                   count === n
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-white/5 text-gray-300 border-white/10 hover:border-white/30"
+                    : "bg-secondary text-muted-foreground border-white/10 hover:border-white/30"
                 }`}
               >
                 {n}
@@ -194,13 +194,30 @@ export default function PYQTestsPage() {
       <ProtectedRoute>
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
           <aside className="w-full md:w-64 flex-shrink-0">
-            <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5 h-80 animate-pulse" />
+            <div className="bg-card shadow-surface rounded-xl p-5 h-80 animate-pulse" />
           </aside>
           <main className="flex-1">
-            <div className="h-16 bg-[#1a1a1a] rounded-xl mb-8 animate-pulse" />
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+
+          <div className="mb-8">
+            <h1 className="text-4xl font-display font-bold text-foreground tracking-tight">Previous Year Questions</h1>
+            <p className="text-muted-foreground mt-2">Authentic UPSC PYQs with verified answers.</p>
+          </div>
+          
+          <div className="flex gap-3 overflow-x-auto pb-4 mb-8 no-scrollbar">
+             {[2023, 2022, 2021, 2020, 2019, 2018, 2017].map(year => (
+               <button 
+                 key={year}
+                 onClick={() => setFilters(prev => ({...prev, years: prev.years.includes(year) ? prev.years.filter(y => y !== year) : [year]}))}
+                 className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all whitespace-nowrap border ${filters.years.includes(year) ? 'bg-primary text-primary-foreground border-primary shadow-surface-glow' : 'bg-card text-muted-foreground border-white/5 hover:bg-white/5 hover:text-foreground shadow-surface'}`}
+               >
+                 UPSC {year}
+               </button>
+             ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-[#1a1a1a] border border-white/5 rounded-xl p-6 h-64 animate-pulse" />
+                <div key={i} className="bg-card shadow-surface rounded-xl p-6 h-64 animate-pulse" />
               ))}
             </div>
           </main>
@@ -213,9 +230,9 @@ export default function PYQTestsPage() {
     return (
       <ProtectedRoute>
         <div className="max-w-7xl mx-auto px-4 py-24 flex flex-col items-center justify-center text-center">
-          <span className="text-6xl mb-6">🏛️</span>
-          <h2 className="text-3xl font-bold text-white mb-2">No PYQs yet</h2>
-          <p className="text-gray-400 mb-8 max-w-md">
+          <span className="text-6xl mb-6 opacity-80">🏛️</span>
+          <h2 className="text-4xl font-display font-bold text-foreground mb-2">No PYQs yet</h2>
+          <p className="text-muted-foreground mb-8 max-w-md">
             Upload a PDF with previous year questions and the AI will automatically extract and tag
             them with exam years.
           </p>
@@ -254,45 +271,53 @@ export default function PYQTestsPage() {
         </aside>
 
         <main className="flex-1">
+
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white tracking-tight">Previous Year Questions</h1>
-            <p className="text-gray-400 mt-2">
-              Authentic UPSC PYQs with verified answers.{" "}
-              {filters.years.length === 1 && (
-                <span className="text-amber-400 font-medium">Filtered: {filters.years[0]}</span>
-              )}
-            </p>
+            <h1 className="text-4xl font-display font-bold text-foreground tracking-tight">Previous Year Questions</h1>
+            <p className="text-muted-foreground mt-2">Authentic UPSC PYQs with verified answers.</p>
+          </div>
+          
+          <div className="flex gap-3 overflow-x-auto pb-4 mb-8 no-scrollbar">
+             {[2023, 2022, 2021, 2020, 2019, 2018, 2017].map(year => (
+               <button 
+                 key={year}
+                 onClick={() => setFilters(prev => ({...prev, years: prev.years.includes(year) ? prev.years.filter(y => y !== year) : [year]}))}
+                 className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all whitespace-nowrap border ${filters.years.includes(year) ? 'bg-primary text-primary-foreground border-primary shadow-surface-glow' : 'bg-card text-muted-foreground border-white/5 hover:bg-white/5 hover:text-foreground shadow-surface'}`}
+               >
+                 UPSC {year}
+               </button>
+             ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {visibleCards.map((card) => (
               <div
                 key={card.id}
-                className="bg-[#1a1a1a] border border-white/5 rounded-xl p-6 flex flex-col hover:border-white/10 transition-colors relative"
+                className="bg-card shadow-surface rounded-xl p-6 flex flex-col hover:shadow-surface-hover transition-colors relative"
               >
                 <div className="flex justify-between items-start mb-6">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center ">
                     <Trophy className="w-5 h-5 text-amber-400" />
                   </div>
-                  <span className="text-xs font-medium bg-amber-500/10 text-amber-300 px-3 py-1 rounded-full border border-amber-500/20">
+                  <span className="text-xs font-medium bg-amber-500/10 text-amber-300 px-3 py-1 rounded-full ">
                     {card.totalQs} PYQs
                   </span>
                 </div>
 
-                <h3 className="text-xl font-bold text-white mb-2 leading-tight">{card.name}</h3>
-                <p className="text-sm text-gray-400 mb-6 line-clamp-2">{card.desc}</p>
+                <h3 className="text-xl font-display font-bold text-foreground mb-2 leading-tight">{card.name}</h3>
+                <p className="text-sm text-muted-foreground mb-6 line-clamp-2">{card.desc}</p>
 
                 <div className="mt-auto">
                   <div className="flex justify-between text-xs font-medium mb-2">
-                    <span className="text-gray-500">Attempted</span>
-                    <span className="text-white">
+                    <span className="text-muted-foreground/70">Attempted</span>
+                    <span className="text-foreground">
                       {card.attempted} / {card.totalQs} Qs
                       {card.accuracy > 0 && (
                         <span className="text-amber-400 ml-1">({Math.round(card.accuracy)}% acc)</span>
                       )}
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-background rounded-full overflow-hidden mb-6 border border-white/5">
+                  <div className="w-full h-1.5 bg-background rounded-full overflow-hidden mb-6 shadow-surface">
                     <div
                       className="h-full bg-amber-500"
                       style={{
@@ -303,7 +328,7 @@ export default function PYQTestsPage() {
 
                   <button
                     onClick={() => setModalSubject(card.name)}
-                    className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-semibold bg-amber-500/10 text-amber-300 hover:bg-amber-500 hover:text-black transition-colors border border-amber-500/20"
+                    className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:scale-[0.98] active:scale-95 ease-snappy transition-all shadow-surface-glow transition-colors "
                   >
                     {card.attempted > 0 ? "Continue PYQs" : "Start PYQs"}
                     <ChevronRight className="w-4 h-4" />

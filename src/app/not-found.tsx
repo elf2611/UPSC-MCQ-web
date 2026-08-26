@@ -1,16 +1,8 @@
-import Link from 'next/link'
- 
+import Link from "next/link";
+import { AlertCircle } from "lucide-react";
+
 export default function NotFound() {
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center text-center px-4 relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-      
-      <div className="relative z-10 space-y-6 max-w-md">
-        <h2 className="text-6xl font-bold text-primary">404</h2>
-        <h3 className="text-2xl font-semibold text-white">Page Not Found</h3>
-        <p className="text-gray-400">
-          The page you are looking for doesn't exist or has been moved.
         </p>
         <Link 
           href="/"

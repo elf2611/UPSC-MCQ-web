@@ -504,7 +504,7 @@ export default function TestInterfaceInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#121212]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -513,10 +513,10 @@ export default function TestInterfaceInner() {
   const isCorrect = currentQ ? answers[currentQ.id]?.toLowerCase().trim() === currentQ.correct_option?.toLowerCase().trim() : false;
 
   return (
-    <div className="h-screen bg-[#121212] flex flex-col overflow-hidden relative">
+    <div className="h-screen bg-background flex flex-col overflow-hidden relative">
       {/* Top Bar */}
-      <header className="bg-[#1a1a1a] border-b border-white/5 px-4 lg:px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0 z-40">
-        <h1 className="font-semibold text-white text-sm lg:text-base truncate max-w-xs lg:max-w-sm">{testName}</h1>
+      <header className="bg-card border-b border-white/5 px-4 lg:px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0 z-40">
+        <h1 className="font-semibold text-foreground text-sm lg:text-base truncate max-w-xs lg:max-w-sm">{testName}</h1>
         <div className={`font-mono text-xl lg:text-2xl font-bold tracking-widest tabular-nums transition-colors ${timerIsLow ? "text-red-400 animate-pulse" : "text-primary"}`}>
           {formatTime(timeLeft)}
         </div>
@@ -536,21 +536,21 @@ export default function TestInterfaceInner() {
           {/* Meta row */}
           <div className="flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">Question <span className="font-bold text-white">{currentIndex + 1}</span> of <span className="font-bold text-white">{questions.length}</span></span>
-              {currentQ?.subject && <span className="text-xs bg-white/5 border border-white/10 text-gray-400 px-2.5 py-0.5 rounded-full">{currentQ.subject}</span>}
+              <span className="text-sm text-muted-foreground/70">Question <span className="font-bold text-foreground">{currentIndex + 1}</span> of <span className="font-bold text-foreground">{questions.length}</span></span>
+              {currentQ?.subject && <span className="text-xs bg-secondary shadow-border text-muted-foreground px-2.5 py-0.5 rounded-full">{currentQ.subject}</span>}
             </div>
-            <span className="text-xs text-gray-600 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">+2 / −0.66</span>
+            <span className="text-xs text-gray-600 bg-secondary px-2.5 py-1 rounded-full shadow-surface">+2 / −0.66</span>
           </div>
 
           {/* Question */}
           {currentQ ? (
             <>
-              <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-6 flex-shrink-0 relative">
+              <div className="bg-card shadow-surface rounded-xl p-6 flex-shrink-0 relative">
                 <button 
                   onClick={handleBookmarkToggle}
-                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/5 transition-colors"
+                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-secondary transition-colors"
                 >
-                  <Bookmark className={`w-5 h-5 ${bookmarkedQuestions.has(currentQ.id) ? "fill-primary text-primary" : "text-gray-400"}`} />
+                  <Bookmark className={`w-5 h-5 ${bookmarkedQuestions.has(currentQ.id) ? "fill-primary text-primary" : "text-muted-foreground"}`} />
                 </button>
                 <div className="flex gap-2 mb-2 flex-wrap">
                   {currentQ.year && (
@@ -564,7 +564,7 @@ export default function TestInterfaceInner() {
                     </span>
                   )}
                 </div>
-                <p className="text-white text-lg leading-relaxed pr-8">{currentQ.question_text}</p>
+                <p className="text-foreground text-lg leading-relaxed pr-8">{currentQ.question_text}</p>
               </div>
 
               {/* Options */}
@@ -576,13 +576,13 @@ export default function TestInterfaceInner() {
                   const showAsWrong = feedbackMode && isSelected && !isCorrect;
 
                   let btnStyle = isSelected
-                    ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(255,191,0,0.08)] text-white"
-                    : "bg-[#1a1a1a] border-white/5 text-gray-300 hover:border-white/20 hover:text-white";
+                    ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(255,191,0,0.08)] text-foreground"
+                    : "bg-background shadow-surface text-muted-foreground hover:border-primary/50 hover:shadow-surface-hover hover:text-foreground";
                   
                   if (feedbackMode) {
-                    if (showAsCorrect) btnStyle = "bg-green-500/20 border-green-500 text-white";
-                    else if (showAsWrong) btnStyle = "bg-red-500/20 border-red-500 text-white";
-                    else btnStyle = "bg-[#1a1a1a] border-white/5 text-gray-500 opacity-70";
+                    if (showAsCorrect) btnStyle = "bg-green-500/20 border-green-500 text-foreground";
+                    else if (showAsWrong) btnStyle = "bg-red-500/20 border-red-500 text-foreground";
+                    else btnStyle = "bg-card border-white/5 text-muted-foreground/70 opacity-70";
                   return (
                     <button
                       key={opt}
@@ -591,17 +591,17 @@ export default function TestInterfaceInner() {
                       className={`
                         w-full text-left p-4 rounded-xl border flex items-start gap-4 
                         transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-[0.98] 
-                        ${showAsCorrect ? "bg-green-500/20 border-green-500 text-white" :
-                          showAsWrong ? "bg-red-500/20 border-red-500 text-white" :
-                          isSelected ? "bg-primary/10 border-primary text-white shadow-[0_0_20px_rgba(255,191,0,0.08)]" : 
-                          feedbackMode ? "bg-[#1a1a1a] border-white/5 text-gray-500 opacity-70" :
-                          "bg-[#1a1a1a] border-white/5 text-gray-300 hover:border-white/20 hover:text-white"
+                        ${showAsCorrect ? "bg-green-500/20 border-green-500 text-foreground" :
+                          showAsWrong ? "bg-red-500/20 border-red-500 text-foreground" :
+                          isSelected ? "bg-primary/10 border-primary text-foreground shadow-[0_0_20px_rgba(255,191,0,0.08)]" : 
+                          feedbackMode ? "bg-card border-white/5 text-muted-foreground/70 opacity-70" :
+                          "bg-background shadow-surface text-muted-foreground hover:border-primary/50 hover:shadow-surface-hover hover:text-foreground"
                         } ${isVerifying ? 'opacity-70 cursor-wait' : ''}`}
                     >
                       <span className={`flex-shrink-0 w-8 h-8 rounded-full border flex items-center justify-center font-bold text-sm transition-colors ${
-                        showAsCorrect ? "bg-green-500 border-green-500 text-white" :
-                        showAsWrong ? "bg-red-500 border-red-500 text-white" :
-                        isSelected ? "bg-primary border-primary text-primary-foreground" : "border-white/20 text-gray-400"
+                        showAsCorrect ? "bg-green-500 border-green-500 text-foreground" :
+                        showAsWrong ? "bg-red-500 border-red-500 text-foreground" :
+                        isSelected ? "bg-primary border-primary text-primary-foreground" : "border-white/20 text-muted-foreground"
                       }`}>
                         {isVerifying && isSelected ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : opt}
                       </span>
@@ -621,21 +621,21 @@ export default function TestInterfaceInner() {
                       {isCorrect ? "Correct!" : `Incorrect. The correct answer was ${currentQ.correct_option}`}
                     </div>
                     {currentQ.explanation && (
-                      <p className="text-gray-300 text-sm leading-relaxed">{currentQ.explanation}</p>
+                      <p className="text-muted-foreground text-sm leading-relaxed">{currentQ.explanation}</p>
                     )}
                   </div>
 
                   {/* Panel 2: Why Wrong Options Fail */}
                   {(currentQ.why_a_wrong || currentQ.why_b_wrong || currentQ.why_c_wrong || currentQ.why_d_wrong) && (
-                    <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-                      <h4 className="text-sm font-semibold text-white mb-3">Why the incorrect options fail</h4>
+                    <div className="bg-card shadow-border rounded-xl p-4">
+                      <h4 className="text-sm font-semibold text-foreground mb-3">Why the incorrect options fail</h4>
                       <div className="space-y-3">
                         {['A','B','C','D'].map(opt => {
                           const wrongReason = currentQ[`why_${opt.toLowerCase()}_wrong` as keyof Question] as string;
                           if (opt !== currentQ.correct_option && wrongReason) {
                             return (
                               <div key={opt} className="text-sm">
-                                <span className="font-bold text-gray-400">Option {opt}:</span> <span className="text-gray-300">{wrongReason}</span>
+                                <span className="font-bold text-muted-foreground">Option {opt}:</span> <span className="text-muted-foreground">{wrongReason}</span>
                               </div>
                             );
                           }
@@ -647,17 +647,17 @@ export default function TestInterfaceInner() {
 
                   {/* Panel 3: Elimination Tip */}
                   {currentQ.elimination_tip && (
-                    <div className="bg-[#1a1a1a] border border-amber-500/30 rounded-xl p-4">
+                    <div className="bg-card border border-amber-500/30 rounded-xl p-4">
                       <h4 className="text-sm font-semibold text-amber-500 mb-2 flex items-center gap-2">🎯 Elimination Tip</h4>
-                      <p className="text-sm text-gray-300">{currentQ.elimination_tip}</p>
+                      <p className="text-sm text-muted-foreground">{currentQ.elimination_tip}</p>
                     </div>
                   )}
 
                   {/* Panel 4: Static Connection */}
                   {currentQ.static_topic_link && (
-                    <div className="bg-[#1a1a1a] border border-blue-500/30 rounded-xl p-4">
+                    <div className="bg-card border border-blue-500/30 rounded-xl p-4">
                       <h4 className="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">🔗 Static Syllabus Connection</h4>
-                      <p className="text-sm text-gray-300 mb-3">{currentQ.static_topic_link}</p>
+                      <p className="text-sm text-muted-foreground mb-3">{currentQ.static_topic_link}</p>
                       <button onClick={() => window.open(`/practice-tests?topic=${encodeURIComponent(currentQ.topic || "")}`, '_blank')} className="text-xs bg-blue-500/20 text-blue-300 px-3 py-1.5 rounded-md hover:bg-blue-500/30 transition-colors">
                         Practice more from this topic →
                       </button>
@@ -665,8 +665,8 @@ export default function TestInterfaceInner() {
                   )}
 
                   {/* Confidence Selector */}
-                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl mt-2 text-center">
-                    <p className="text-sm text-gray-400 mb-3">How well did you know this?</p>
+                  <div className="bg-secondary shadow-border p-4 rounded-xl mt-2 text-center">
+                    <p className="text-sm text-muted-foreground mb-3">How well did you know this?</p>
                     <div className="flex justify-center gap-3">
                       <button onClick={() => handleConfidenceSelect("easy")} className="px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg text-sm font-medium hover:bg-green-500/30">Easy ✓</button>
                       <button onClick={() => handleConfidenceSelect("got_it")} className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-sm font-medium hover:bg-blue-500/30">Got it ~</button>
@@ -684,12 +684,12 @@ export default function TestInterfaceInner() {
                       <button onClick={handleMarkForReview} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors">
                         <Bookmark className="w-4 h-4" /> Mark for Review
                       </button>
-                      <button onClick={handleClearResponse} className="px-4 py-2 rounded-lg text-sm font-medium bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white transition-colors">
+                      <button onClick={handleClearResponse} className="px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-muted-foreground shadow-border hover:bg-secondary/80 hover:text-foreground transition-colors">
                         Clear Response
                       </button>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setCurrentIndex(i => Math.max(0, i - 1))} disabled={currentIndex === 0} className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white disabled:opacity-40 transition-colors">
+                      <button onClick={() => setCurrentIndex(i => Math.max(0, i - 1))} disabled={currentIndex === 0} className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-muted-foreground shadow-border hover:bg-secondary/80 hover:text-foreground disabled:opacity-40 transition-colors">
                         <ChevronLeft className="w-4 h-4" /> Prev
                       </button>
                       {currentIndex < questions.length - 1 ? (
@@ -697,7 +697,7 @@ export default function TestInterfaceInner() {
                           {mode === 'practice' && answers[currentQ.id] ? 'Check Answer' : 'Save & Next'} <ChevronRight className="w-4 h-4" />
                         </button>
                       ) : (
-                        <button onClick={handleSubmit} className="flex items-center gap-1 px-6 py-2 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 transition-colors">
+                        <button onClick={handleSubmit} className="flex items-center gap-1 px-6 py-2 rounded-lg text-sm font-bold bg-green-600 text-foreground hover:bg-green-700 transition-colors">
                           Submit Test <CheckCircle2 className="w-4 h-4" />
                         </button>
                       )}
@@ -710,7 +710,7 @@ export default function TestInterfaceInner() {
                         Next Question <ChevronRight className="w-4 h-4" />
                       </button>
                     ) : (
-                      <button onClick={handleSubmit} className="flex items-center gap-1 px-8 py-3 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 transition-colors w-full md:w-auto justify-center">
+                      <button onClick={handleSubmit} className="flex items-center gap-1 px-8 py-3 rounded-lg text-sm font-bold bg-green-600 text-foreground hover:bg-green-700 transition-colors w-full md:w-auto justify-center">
                         Submit Test <CheckCircle2 className="w-4 h-4" />
                       </button>
                     )}
@@ -719,18 +719,18 @@ export default function TestInterfaceInner() {
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center flex-1 text-gray-500">
+            <div className="flex items-center justify-center flex-1 text-muted-foreground/70">
               <AlertCircle className="w-5 h-5 mr-2" /> No questions found.
             </div>
           )}
         </main>
 
         {/* Right Sidebar — Question Palette */}
-        <aside className="hidden lg:flex w-64 xl:w-72 flex-col bg-[#1a1a1a] border-l border-white/5 p-4 flex-shrink-0 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-white mb-4 flex-shrink-0">Question Palette</h3>
+        <aside className="hidden lg:flex w-64 xl:w-72 flex-col bg-card border-l border-white/5 p-4 flex-shrink-0 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-foreground mb-4 flex-shrink-0">Question Palette</h3>
 
           {/* Legend */}
-          <div className="grid grid-cols-1 gap-y-1.5 mb-5 text-xs text-gray-500 flex-shrink-0">
+          <div className="grid grid-cols-1 gap-y-1.5 mb-5 text-xs text-muted-foreground/70 flex-shrink-0">
             {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
               <div key={key} className="flex items-center gap-2">
                 <div className={`w-4 h-4 rounded border flex-shrink-0 ${cfg.bg} ${cfg.border}`} />
@@ -749,7 +749,7 @@ export default function TestInterfaceInner() {
                 <button
                   key={q.id}
                   onClick={() => { setCurrentIndex(i); setFeedbackMode(false); }}
-                  className={`aspect-square rounded-md text-xs font-bold border transition-all ${cfg.bg} ${cfg.border} ${isCurrent ? "ring-2 ring-primary ring-offset-1 ring-offset-[#1a1a1a] text-white scale-110" : "text-gray-300 hover:scale-105"}`}
+                  className={`aspect-square rounded-md text-xs font-bold border transition-all ${cfg.bg} ${cfg.border} ${isCurrent ? "ring-2 ring-primary ring-offset-1 ring-offset-[#1a1a1a] text-foreground scale-110" : "text-muted-foreground hover:scale-105"}`}
                 >
                   {i + 1}
                 </button>
@@ -758,11 +758,11 @@ export default function TestInterfaceInner() {
           </div>
 
           {/* Live Summary */}
-          <div className="mt-4 pt-4 border-t border-white/5 space-y-2 text-xs text-gray-500 flex-shrink-0">
+          <div className="mt-4 pt-4 border-t border-white/5 space-y-2 text-xs text-muted-foreground/70 flex-shrink-0">
             <div className="flex justify-between"><span>Answered</span><span className="text-green-400 font-bold">{answered}</span></div>
             <div className="flex justify-between"><span>Not Answered</span><span className="text-red-400 font-bold">{unanswered}</span></div>
             <div className="flex justify-between"><span>Marked for Review</span><span className="text-purple-400 font-bold">{markedReview}</span></div>
-            <div className="flex justify-between"><span>Not Visited</span><span className="text-gray-400 font-bold">{notVisited}</span></div>
+            <div className="flex justify-between"><span>Not Visited</span><span className="text-muted-foreground font-bold">{notVisited}</span></div>
           </div>
         </aside>
       </div>
@@ -770,7 +770,7 @@ export default function TestInterfaceInner() {
       {/* Custom Toast Notification */}
       {toastMessage && (
         <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] border flex items-center gap-3 animate-in slide-in-from-top-8 fade-in duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] backdrop-blur-md ${
-          toastMessage.isLevelUp ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400" : "bg-[#1a1a1a]/80 text-white border-white/10"
+          toastMessage.isLevelUp ? "bg-gradient-to-r from-amber-500 to-amber-600 text-foreground border-amber-400" : "bg-card/80 text-foreground border-white/10"
         }`}>
           {toastMessage.isLevelUp && <span className="text-2xl">🎉</span>}
           <span className="font-bold text-sm">{toastMessage.message}</span>

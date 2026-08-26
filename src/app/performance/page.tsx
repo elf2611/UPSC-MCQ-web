@@ -55,26 +55,26 @@ const ALL_BADGES: BadgeDef[] = [
 // ── Stat Card ──────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, icon, color, progress }: { label: string; value: string; sub?: React.ReactNode; icon: React.ReactNode; color: string; progress?: { current: number, max: number } }) {
   return (
-    <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-5 flex flex-col justify-between">
+    <div className="bg-card shadow-surface rounded-2xl p-5 flex flex-col justify-between">
       <div className="flex items-start gap-4">
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border ${color}`}>
           {icon}
         </div>
         <div>
-          <p className="text-xs text-gray-500 font-medium mb-0.5">{label}</p>
-          <p className="text-2xl font-extrabold text-white">{value}</p>
-          {sub && <div className="text-xs text-gray-600 mt-1">{sub}</div>}
+          <p className="text-xs text-muted-foreground/70 font-medium mb-0.5">{label}</p>
+          <p className="text-2xl font-extrabold text-foreground">{value}</p>
+          {sub && <div className="text-xs text-muted-foreground/50 mt-1">{sub}</div>}
         </div>
       </div>
       {progress && (
         <div className="mt-4">
-          <div className="h-1.5 bg-background rounded-full overflow-hidden border border-white/5">
+          <div className="h-1.5 bg-background shadow-surface rounded-full overflow-hidden shadow-surface">
             <div 
               className="h-full bg-amber-500 transition-all duration-300"
               style={{ width: `${Math.min(100, (progress.current / progress.max) * 100)}%` }}
             />
           </div>
-          <div className="text-[10px] text-gray-500 text-right mt-1 font-medium">{progress.current} / {progress.max} XP</div>
+          <div className="text-[10px] text-muted-foreground/70 text-right mt-1 font-medium">{progress.current} / {progress.max} XP</div>
         </div>
       )}
     </div>
@@ -183,7 +183,7 @@ export default function PerformancePage() {
     <div className="min-h-screen flex items-center justify-center bg-[#121212]">
       <div className="text-center">
         <span className="text-5xl mb-4 block">🔐</span>
-        <p className="text-gray-400">Please log in to view your performance.</p>
+        <p className="text-muted-foreground">Please log in to view your performance.</p>
       </div>
     </div>
   );
@@ -193,8 +193,8 @@ export default function PerformancePage() {
       <div className="min-h-screen flex items-center justify-center bg-[#121212]">
         <div className="flex flex-col items-center justify-center gap-4 text-center max-w-sm">
           <span className="text-6xl">📊</span>
-          <h2 className="text-2xl font-bold text-white">No performance data yet</h2>
-          <p className="text-gray-400">Complete a practice session or mock test to see your analytics here.</p>
+          <h2 className="text-3xl font-display font-bold text-foreground tabular-nums tracking-tight text-foreground text-balance">No performance data yet</h2>
+          <p className="text-muted-foreground">Complete a practice session or mock test to see your analytics here.</p>
           <a href="/practice-tests" className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-bold hover:bg-primary/90 transition-colors">
             Start Practicing →
           </a>
@@ -213,8 +213,8 @@ export default function PerformancePage() {
         
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Performance Analytics</h1>
-          <p className="text-gray-400 mt-1">Track your growth and identify areas to improve.</p>
+          <h1 className="text-3xl font-bold text-foreground text-balance">Performance Analytics</h1>
+          <p className="text-muted-foreground mt-1">Track your growth and identify areas to improve.</p>
         </div>
 
         {/* Upgraded Stats Row */}
@@ -252,9 +252,9 @@ export default function PerformancePage() {
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Score Trend Line Chart */}
-          <div className="lg:col-span-2 bg-[#1a1a1a] border border-white/5 rounded-2xl p-6">
+          <div className="lg:col-span-2 bg-card shadow-surface rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-white font-semibold">Score Trend (Last 10 Tests)</h3>
+              <h3 className="text-foreground font-display font-bold text-lg">Score Trend (Last 10 Tests)</h3>
             </div>
             <div className="h-64">
               {attempts.length > 0 ? (
@@ -269,31 +269,65 @@ export default function PerformancePage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2a2a2a" />
                     <XAxis dataKey="name" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: "#1a1a1a", borderColor: "#374151", color: "#fff", borderRadius: "8px" }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 2, strokeDasharray: "3 3" }} />
                     <Line type="monotone" dataKey="score" stroke="#ffbf00" strokeWidth={3} dot={{ fill: "#ffbf00", r: 5, strokeWidth: 2, stroke: "#1a1a1a" }} activeDot={{ r: 7 }} isAnimationActive={true} animationDuration={2000} animationEasing="ease-in-out" />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">Take some tests to see your trend</div>
+                <div className="flex items-center justify-center h-full text-muted-foreground/70">Take some tests to see your trend</div>
               )}
             </div>
           </div>
 
           {/* Radar Chart (Subject Mastery placeholder for now since we don't have aggregated subject radar data easily available, keeping existing UI structure) */}
-          <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6">
-            <h3 className="text-white font-semibold mb-4">Subject Mastery</h3>
-            <div className="h-64 flex items-center justify-center text-sm text-gray-500 border border-dashed border-white/10 rounded-xl">
-              Complete subject-specific tests to unlock radar chart.
-            </div>
+          
+          <div className="bg-card shadow-surface rounded-2xl p-6">
+            <h3 className="text-foreground font-display font-bold text-lg mb-6">Subject Competency</h3>
+            {weakTopics.length > 0 ? (
+              <div className="space-y-6">
+                 <div>
+                   <p className="text-xs font-bold text-green-400 uppercase tracking-widest mb-3">Strongest Pillar</p>
+                   {(() => {
+                      const strong = [...weakTopics].sort((a, b) => b.accuracy - a.accuracy)[0];
+                      if (strong && strong.accuracy >= 50) return (
+                         <div className="flex justify-between items-center bg-green-500/10 border border-green-500/20 p-4 rounded-xl">
+                            <div><p className="text-green-300 font-bold">{strong.topic_name}</p><p className="text-xs text-green-500/70">{strong.subject_name}</p></div>
+                            <span className="text-xl font-display font-bold tabular-nums text-green-400">{strong.accuracy.toFixed(1)}%</span>
+                         </div>
+                      );
+                      return <div className="text-xs text-muted-foreground/70">Need higher accuracy to determine strongest subject.</div>;
+                   })()}
+                 </div>
+                 <div>
+                   <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-3">Needs Immediate Focus</p>
+                   {(() => {
+                      const weak = [...weakTopics].sort((a, b) => a.accuracy - b.accuracy)[0];
+                      if (weak && weak.accuracy < 50) return (
+                         <div className="flex justify-between items-center bg-red-500/10 border border-red-500/20 p-4 rounded-xl">
+                            <div><p className="text-red-300 font-bold">{weak.topic_name}</p><p className="text-xs text-red-500/70">{weak.subject_name}</p></div>
+                            <span className="text-xl font-display font-bold tabular-nums text-red-400">{weak.accuracy.toFixed(1)}%</span>
+                         </div>
+                      );
+                      return <div className="text-xs text-muted-foreground/70">No critically weak subjects identified yet.</div>;
+                   })()}
+                 </div>
+              </div>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-sm text-muted-foreground/70 border border-dashed border-white/10 rounded-xl text-center px-6 text-balance">
+                Complete subject-specific tests to unlock strength analysis.
+              </div>
+            )}
           </div>
+
+        </div>
         </div>
 
         {/* Analytics Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           
           {/* Weak Topics Section */}
-          <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 flex flex-col">
-            <h3 className="text-white font-semibold flex items-center gap-2 mb-6">
+          <div className="bg-card shadow-surface rounded-2xl p-6 flex flex-col">
+            <h3 className="text-foreground font-display font-bold text-lg flex items-center gap-2 mb-6">
               <TrendingUp className="w-5 h-5 text-red-400 rotate-180" /> 📉 Topics to Focus On
             </h3>
             
@@ -302,10 +336,10 @@ export default function PerformancePage() {
                 {weakTopics.map((w, i) => {
                   const color = w.accuracy < 40 ? "text-red-400" : w.accuracy <= 65 ? "text-amber-400" : "text-green-400";
                   return (
-                    <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-white/5 bg-background">
+                    <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl shadow-surface bg-background shadow-surface">
                       <div>
-                        <p className="text-white font-medium">{w.topic_name}</p>
-                        <p className="text-xs text-gray-500">{w.subject_name} • {w.attempted} attempted</p>
+                        <p className="text-foreground font-medium">{w.topic_name}</p>
+                        <p className="text-xs text-muted-foreground/70">{w.subject_name} • {w.attempted} attempted</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <span className={`font-bold ${color}`}>{w.accuracy.toFixed(1)}%</span>
@@ -319,44 +353,44 @@ export default function PerformancePage() {
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-white/10 rounded-xl">
-                <p className="text-gray-400 text-sm">Complete some practice sessions (min 5 attempts per topic) to see your weak areas.</p>
+                <p className="text-muted-foreground text-sm">Complete some practice sessions (min 5 attempts per topic) to see your weak areas.</p>
               </div>
             )}
           </div>
 
           {/* 90-Day Activity Heatmap */}
-          <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6">
-            <h3 className="text-white font-semibold flex items-center gap-2 mb-6">
+          <div className="bg-card shadow-surface rounded-2xl p-6">
+            <h3 className="text-foreground font-display font-bold text-lg flex items-center gap-2 mb-6">
               <Activity className="w-5 h-5 text-primary" /> Practice Activity
             </h3>
-            <div className="border border-white/5 p-6 rounded-xl bg-background">
+            <div className="shadow-surface p-6 rounded-xl bg-background shadow-surface">
               <ActivityHeatmap heatmapMap={heatmapMap} title="Last 90 Days" />
             </div>
             
             <div className="mt-6 flex items-center justify-between">
-              <h3 className="text-white font-semibold text-sm">Recent Tests</h3>
+              <h3 className="text-foreground font-display font-bold text-lg text-sm">Recent Tests</h3>
               <Link href="/profile?tab=history" className="text-xs text-primary hover:text-primary/80 flex items-center gap-1">
                 View All <ExternalLink className="w-3 h-3" />
               </Link>
             </div>
             <div className="mt-4 space-y-2">
               {attempts.slice(0, 3).map(t => (
-                 <Link key={t.id as string} href={`/results?attempt_id=${t.id as string}`} className="flex items-center justify-between p-3 rounded-lg border border-white/5 hover:bg-white/5 transition-colors">
+                 <Link key={t.id as string} href={`/results?attempt_id=${t.id as string}`} className="flex items-center justify-between p-3 rounded-lg shadow-surface hover:bg-white/5 transition-colors">
                     <div>
-                      <p className="text-gray-300 text-sm font-medium">Test {t.mode as string}</p>
-                      <p className="text-xs text-gray-600">{new Date(t.created_at as string).toLocaleDateString()}</p>
+                      <p className="text-muted-foreground text-sm font-medium">Test {t.mode as string}</p>
+                      <p className="text-xs text-muted-foreground/50">{new Date(t.created_at as string).toLocaleDateString()}</p>
                     </div>
                     <span className="text-amber-400 font-bold text-sm">{t.score as number}</span>
                  </Link>
               ))}
-              {attempts.length === 0 && <p className="text-xs text-gray-500">No tests taken yet.</p>}
+              {attempts.length === 0 && <p className="text-xs text-muted-foreground/70">No tests taken yet.</p>}
             </div>
           </div>
         </div>
 
         {/* Achievements / Badges Section */}
-        <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6 mb-8">
-          <h3 className="text-white font-semibold flex items-center gap-2 mb-6 text-xl">
+        <div className="bg-card shadow-surface rounded-2xl p-6 mb-8">
+          <h3 className="text-foreground font-display font-bold text-lg flex items-center gap-2 mb-6 text-xl">
             🏆 Achievements
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -364,23 +398,23 @@ export default function PerformancePage() {
               <div 
                 key={b.id as string} 
                 className={`flex flex-col items-center text-center p-4 rounded-xl border transition-all ${
-                  b.earned ? "bg-amber-500/10 border-amber-500/30" : "bg-background border-white/5 opacity-60 grayscale"
+                  b.earned ? "bg-amber-500/10 border-amber-500/30" : "bg-background shadow-surface border-white/5 opacity-60 grayscale"
                 }`}
               >
                 <div className={`text-4xl mb-3 ${b.earned ? "drop-shadow-[0_0_15px_rgba(255,191,0,0.4)]" : ""}`}>
                   {b.icon as string}
                 </div>
-                <h4 className={`font-bold text-sm mb-1 ${b.earned ? "text-amber-400" : "text-gray-400"}`}>
+                <h4 className={`font-bold text-sm mb-1 ${b.earned ? "text-amber-400" : "text-muted-foreground"}`}>
                   {b.name as string}
                 </h4>
-                <p className="text-xs text-gray-500 mb-2 leading-tight min-h-[32px] flex items-center justify-center">
+                <p className="text-xs text-muted-foreground/70 mb-2 leading-tight min-h-[32px] flex items-center justify-center">
                   {b.desc as string}
                 </p>
                 <div className="mt-auto text-[10px] font-bold uppercase tracking-wider">
                   {b.earned ? (
                     <span className="text-green-500 flex items-center gap-1">✓ Earned</span>
                   ) : (
-                    <span className="text-gray-600">Locked</span>
+                    <span className="text-muted-foreground/50">Locked</span>
                   )}
                 </div>
               </div>

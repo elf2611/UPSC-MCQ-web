@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss"
+const { fontFamily } = require("tailwindcss/defaultTheme")
 
 const config = {
   darkMode: ["class"],
@@ -18,45 +19,58 @@ const config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", ...fontFamily.sans],
+        display: ["var(--font-display)", ...fontFamily.sans],
+      },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: "rgba(255, 255, 255, 0.06)",
+        input: "rgba(255, 255, 255, 0.06)",
+        ring: "#FFBF00",
+        background: "#0B0B0F",
+        foreground: "#EDEDED",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#FFBF00",
+          foreground: "#0B0B0F",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "rgba(255, 255, 255, 0.05)",
+          foreground: "#EDEDED",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "#ef4444",
+          foreground: "#FFFFFF",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "rgba(255, 255, 255, 0.05)",
+          foreground: "#A1A1AA",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "#FFBF00",
+          foreground: "#0B0B0F",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "#0E0E12",
+          foreground: "#EDEDED",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "#0E0E12",
+          foreground: "#EDEDED",
         },
       },
+      boxShadow: {
+        'surface': '0 0 0 1px rgba(255, 255, 255, 0.06)',
+        'surface-hover': '0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2)',
+        'surface-glow': '0 0 0 1px rgba(255, 191, 0, 0.3), 0 0 20px rgba(255, 191, 0, 0.08)',
+      },
+      transitionTimingFunction: {
+        'snappy': 'cubic-bezier(.175,.885,.32,1.1)',
+        'entrance': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+      },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "0.75rem",
+        md: "0.5rem",
+        sm: "0.25rem",
       },
       keyframes: {
         "accordion-down": {

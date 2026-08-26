@@ -27,7 +27,7 @@ function AnimatedCounter({ value, decimals = 0 }: { value: number; decimals?: nu
     };
     requestAnimationFrame(animate);
   }, [value]);
-  return <span>{count.toFixed(decimals)}</span>;
+  return <span className="tabular-nums font-display tracking-tight">{count.toFixed(decimals)}</span>;
 }
 
 function CompletionAnimation() {
@@ -38,9 +38,15 @@ function CompletionAnimation() {
   }, []);
   if (!show) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-zinc-950/80 backdrop-blur-sm animate-[fadeOut_0.5s_ease-out_2s_forwards]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-background/80 backdrop-blur-sm animate-[fadeOut_0.5s_ease-out_2s_forwards]">
       <div className="relative flex items-center justify-center animate-[scaleIn_0.5s_cubic-bezier(0.34,1.56,0.64,1)]">
-        <div className="absolute w-32 h-32 bg-amber-500/20 rounded-full animate-ping" style={{ animationDuration: '1.5s' }} />
+        <div className="absolute w-64 h-64 bg-primary/20 rounded-full animate-ping" style={{ animationDuration: '1.5s' }} />
+        {/* Simple CSS Confetti */}
+        <div className="absolute inset-0 flex items-center justify-center">
+           <div className="w-2 h-2 bg-red-500 rounded-full absolute animate-[ping_1s_ease-out_infinite] -top-10 -left-10" />
+           <div className="w-2 h-2 bg-blue-500 rounded-full absolute animate-[ping_1.2s_ease-out_infinite] top-10 -right-12" />
+           <div className="w-2 h-2 bg-green-500 rounded-full absolute animate-[ping_0.8s_ease-out_infinite] -bottom-8 left-4" />
+        </div>
         <div className="relative w-24 h-24 bg-amber-500 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(245,158,11,0.4)]">
           <svg className="w-12 h-12 text-zinc-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" className="animate-[strokeDraw_0.5s_ease-out_0.2s_forwards]" style={{ strokeDasharray: 24, strokeDashoffset: 24 }} />
@@ -218,7 +224,7 @@ export default function ResultsInner() {
     <div className="min-h-screen flex items-center justify-center bg-[#121212]">
       <div className="bg-[#1a1a1a] border border-red-500/30 p-8 rounded-2xl max-w-md text-center">
         <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-white mb-2">Error Loading Results</h2>
+        <h2 className="text-xl font-bold text-foreground mb-2">Error Loading Results</h2>
         <p className="text-gray-400 mb-6">{errorMsg || 'Could not load the results for this test.'}</p>
         <Link href="/" className="inline-block bg-amber-500 text-black px-6 py-3 rounded-lg font-bold hover:bg-amber-400 transition-colors">
           Go to Dashboard
@@ -265,18 +271,18 @@ export default function ResultsInner() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-zinc-950 pb-20">
+      <div className="min-h-screen bg-background pb-20">
         <CompletionAnimation />
         
         {/* Header */}
-        <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="bg-card shadow-surface border-b border-white/5 px-6 py-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
-            <h1 className="text-white font-semibold text-xl">Test Results</h1>
-            <p className="text-zinc-400 text-sm mt-1">Submitted on {format(attempt.submitted_at)}</p>
+            <h1 className="text-foreground font-semibold text-xl">Test Results</h1>
+            <p className="text-muted-foreground text-sm mt-1">Submitted on {format(attempt.submitted_at)}</p>
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             <button onClick={() => router.push('/practice-tests')}
-              className="flex-1 sm:flex-none px-4 py-2 rounded-lg border border-zinc-700 text-zinc-300 text-sm font-medium hover:bg-zinc-800 transition-colors">
+              className="flex-1 sm:flex-none px-4 py-2 rounded-lg border border-white/10 text-foreground text-sm font-medium hover:bg-card/80 transition-colors">
               Practice Again
             </button>
             <button onClick={() => router.push('/performance')}
@@ -291,7 +297,7 @@ export default function ResultsInner() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 lg:p-6">
             
             {/* Big score card - takes 2 cols */}
-            <div className="lg:col-span-2 bg-zinc-900 rounded-2xl p-6 border border-zinc-800 flex flex-col items-center justify-center text-center">
+            <div className="lg:col-span-2 bg-card shadow-surface rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center">
               {/* Circular score ring */}
               <div className="relative w-36 h-36 mb-4">
                 <svg className="w-36 h-36 -rotate-90" viewBox="0 0 144 144">
@@ -307,45 +313,45 @@ export default function ResultsInner() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-3xl font-bold text-amber-400"><AnimatedCounter value={accuracy} />%</span>
-                  <span className="text-zinc-400 text-xs mt-1">Accuracy</span>
+                  <span className="text-muted-foreground text-xs mt-1">Accuracy</span>
                 </div>
               </div>
-              <div className="text-4xl font-bold text-white mb-1">
+              <div className="text-4xl font-bold text-foreground mb-1">
                 <AnimatedCounter value={score} decimals={1} />
-                <span className="text-xl text-zinc-400 font-normal ml-1">/ {totalMarks}</span>
+                <span className="text-xl text-muted-foreground font-normal ml-1">/ {totalMarks}</span>
               </div>
-              <p className="text-zinc-400 text-sm">Total Score</p>
+              <p className="text-muted-foreground text-sm">Total Score</p>
             </div>
 
             {/* Stats grid - takes 3 cols */}
             <div className="lg:col-span-3 grid grid-cols-2 gap-4">
               {/* Correct */}
-              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-green-500 flex flex-col justify-center">
+              <div className="bg-card shadow-surface rounded-2xl p-5 border border-white/5 border-l-4 border-l-green-500 flex flex-col justify-center">
                 <div className="text-3xl font-bold text-green-400 mb-1"><AnimatedCounter value={correct} /></div>
-                <div className="text-zinc-400 text-sm font-medium">Correct</div>
+                <div className="text-muted-foreground text-sm font-medium">Correct</div>
                 <div className="text-green-500 text-xs mt-1 font-medium">+<AnimatedCounter value={correct * 2} decimals={2} /> marks</div>
               </div>
 
               {/* Wrong */}
-              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-red-500 flex flex-col justify-center">
+              <div className="bg-card shadow-surface rounded-2xl p-5 border border-white/5 border-l-4 border-l-red-500 flex flex-col justify-center">
                 <div className="text-3xl font-bold text-red-400 mb-1"><AnimatedCounter value={wrong} /></div>
-                <div className="text-zinc-400 text-sm font-medium">Incorrect</div>
+                <div className="text-muted-foreground text-sm font-medium">Incorrect</div>
                 <div className="text-red-500 text-xs mt-1 font-medium">-<AnimatedCounter value={wrong * (2/3)} decimals={2} /> marks</div>
               </div>
 
               {/* Skipped */}
-              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-zinc-500 flex flex-col justify-center">
-                <div className="text-3xl font-bold text-zinc-300 mb-1">{unattempted}</div>
-                <div className="text-zinc-400 text-sm font-medium">Skipped</div>
-                <div className="text-zinc-500 text-xs mt-1 font-medium">0 marks</div>
+              <div className="bg-card shadow-surface rounded-2xl p-5 border border-white/5 border-l-4 border-l-zinc-500 flex flex-col justify-center">
+                <div className="text-3xl font-bold text-foreground mb-1">{unattempted}</div>
+                <div className="text-muted-foreground text-sm font-medium">Skipped</div>
+                <div className="text-muted-foreground/70 text-xs mt-1 font-medium">0 marks</div>
               </div>
 
               {/* Time */}
-              <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 border-l-4 border-l-blue-500 flex flex-col justify-center">
+              <div className="bg-card shadow-surface rounded-2xl p-5 border border-white/5 border-l-4 border-l-blue-500 flex flex-col justify-center">
                 <div className="text-3xl font-bold text-blue-400 mb-1">
                   {formatTime(timeTaken)}
                 </div>
-                <div className="text-zinc-400 text-sm font-medium">Time Taken</div>
+                <div className="text-muted-foreground text-sm font-medium">Time Taken</div>
                 <div className="text-blue-500 text-xs mt-1 font-medium">
                   ~{Math.round((timeTaken || 0) / (correct + wrong + unattempted || 1))}s per question
                 </div>
@@ -354,8 +360,8 @@ export default function ResultsInner() {
           </div>
 
           {/* ── SUBJECT BREAKDOWN CHART ── */}
-          <div className="mx-4 lg:mx-6 mb-6 bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
-            <h2 className="text-white font-semibold mb-6">Subject-wise Breakdown</h2>
+          <div className="mx-4 lg:mx-6 mb-6 bg-card shadow-surface rounded-2xl p-6 border border-white/5">
+            <h2 className="text-foreground font-semibold mb-6">Subject-wise Breakdown</h2>
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={chartData} barSize={20} margin={{ top: 5, right: 20, left: 0, bottom: 25 }}>
@@ -370,23 +376,23 @@ export default function ResultsInner() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-zinc-500 text-center py-8">No subject data available</p>
+              <p className="text-muted-foreground/70 text-center py-8">No subject data available</p>
             )}
           </div>
 
           {/* ── QUESTION REVIEW ── */}
-          <div className="mx-4 lg:mx-6 mb-6 bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+          <div className="mx-4 lg:mx-6 mb-6 bg-card shadow-surface rounded-2xl border border-white/5 overflow-hidden">
             
             {/* Filter chips */}
-            <div className="flex flex-wrap items-center gap-2 p-4 border-b border-zinc-800 bg-zinc-900/50">
-              <span className="text-white font-semibold mr-2">Question Review</span>
+            <div className="flex flex-wrap items-center gap-2 p-4 border-b border-white/5 bg-card shadow-surface/50">
+              <span className="text-foreground font-semibold mr-2">Question Review</span>
               {(['All', 'Correct', 'Incorrect', 'Skipped'] as FilterType[]).map(f => (
                 <button key={f}
                   onClick={() => setFilter(f)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     filter === f
                       ? 'bg-amber-500 text-black'
-                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                      : 'bg-card/80 text-muted-foreground hover:bg-zinc-700 hover:text-foreground'
                   }`}>
                   {f} {f === 'All' ? `(${answers.length})` : f === 'Correct' ? `($<AnimatedCounter value={correct} />)` : f === 'Incorrect' ? `($<AnimatedCounter value={wrong} />)` : `(${unattempted})`}
                 </button>
@@ -397,7 +403,7 @@ export default function ResultsInner() {
             <div className="divide-y divide-zinc-800/60">
               {filteredAnswers.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-zinc-500 text-sm">
+                  <p className="text-muted-foreground/70 text-sm">
                     {answers?.length === 0 
                       ? 'Answer data not available for this attempt.'
                       : `No ${filter.toLowerCase()} questions found.`
@@ -414,12 +420,12 @@ export default function ResultsInner() {
               ) : filteredAnswers.map((ans) => {
                 const originalIndex = answers.findIndex(a => a.question_id === ans.question_id);
                 return (
-                  <div key={ans.question_id} className="p-4 sm:p-6 hover:bg-zinc-800/20 transition-colors">
+                  <div key={ans.question_id} className="p-4 sm:p-6 hover:bg-card/80/20 transition-colors">
                     
                     {/* Question header */}
                     <div className="flex items-start gap-3 mb-4">
                       <span className={`flex-shrink-0 w-8 h-8 mt-0.5 rounded-full flex items-center justify-center text-sm font-bold ${
-                          !ans.selected_option ? 'bg-zinc-800 text-zinc-400' : 
+                          !ans.selected_option ? 'bg-card/80 text-muted-foreground' : 
                           ans.is_correct ? 'bg-green-950 text-green-400 ring-1 ring-green-900' : 'bg-red-950 text-red-400 ring-1 ring-red-900'
                         }`}>
                         {originalIndex + 1}
@@ -437,9 +443,9 @@ export default function ResultsInner() {
                             </span>
                           )}
                         </div>
-                        <p className="text-zinc-200 text-base leading-relaxed">{ans.questions?.question_text}</p>
+                        <p className="text-foreground text-base leading-relaxed">{ans.questions?.question_text}</p>
                         {ans.questions?.subject && (
-                          <span className="inline-block mt-2 text-xs font-medium text-zinc-500 uppercase tracking-wider">{ans.questions.subject}</span>
+                          <span className="inline-block mt-2 text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">{ans.questions.subject}</span>
                         )}
                       </div>
                     </div>
@@ -455,11 +461,11 @@ export default function ResultsInner() {
                           <div key={opt} className={`px-4 py-3 rounded-xl text-sm flex items-start gap-3 border transition-colors ${
                             isCorrect ? 'border-green-600/50 bg-green-950/30 text-green-300' : 
                             isSelected && !isCorrect ? 'border-red-600/50 bg-red-950/30 text-red-300' : 
-                            'border-zinc-800 bg-zinc-800/30 text-zinc-400'
+                            'border-white/5 bg-card/80/30 text-muted-foreground'
                           }`}>
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                              isCorrect ? 'bg-green-700 text-white' : 
-                              isSelected ? 'bg-red-700 text-white' : 'bg-zinc-700 text-zinc-300'
+                              isCorrect ? 'bg-green-700 text-foreground' : 
+                              isSelected ? 'bg-red-700 text-foreground' : 'bg-zinc-700 text-foreground'
                             }`}>
                               {opt.toUpperCase()}
                             </span>
@@ -473,21 +479,21 @@ export default function ResultsInner() {
 
                     {/* Explanation - collapsible */}
                     <details className="ml-0 sm:ml-11 group">
-                      <summary className="text-amber-500 text-sm cursor-pointer hover:text-amber-400 font-medium inline-flex items-center gap-1 select-none">
+                      <summary className="text-primary text-sm cursor-pointer hover:text-primary/80 font-bold inline-flex items-center gap-2 select-none uppercase tracking-widest mt-4">
                         View Explanation & Analysis <span className="text-xs opacity-60 group-open:rotate-180 transition-transform">▼</span>
                       </summary>
                       <div className="mt-4 space-y-3">
                         {/* Explanation */}
                         {ans.questions?.explanation && (
-                          <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700/50">
-                            <p className="text-zinc-300 text-xs font-bold uppercase tracking-wider mb-2">📖 Explanation</p>
-                            <p className="text-zinc-400 text-sm leading-relaxed">{ans.questions.explanation}</p>
+                          <div className="bg-card shadow-surface rounded-xl p-5">
+                            <p className="text-foreground text-xs font-bold uppercase tracking-wider mb-2">📖 Explanation</p>
+                            <p className="text-muted-foreground text-sm leading-relaxed">{ans.questions.explanation}</p>
                           </div>
                         )}
 
                         {/* Why wrong */}
                         {['a','b','c','d'].some(opt => opt !== ans.questions?.correct_option?.toLowerCase() && ans.questions?.[`why_${opt}_wrong` as keyof Question]) && (
-                          <div className="bg-red-950/20 rounded-xl p-4 border border-red-900/30">
+                          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5">
                             <p className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">❌ Why incorrect options fail</p>
                             <div className="space-y-2">
                               {['a','b','c','d'].map(opt => {
@@ -495,8 +501,8 @@ export default function ResultsInner() {
                                 const why = ans.questions?.[`why_${opt}_wrong` as keyof Question] as string;
                                 if (!why) return null;
                                 return (
-                                  <p key={opt} className="text-zinc-400 text-sm">
-                                    <span className="text-zinc-300 font-medium">Option {opt.toUpperCase()}:</span> {why}
+                                  <p key={opt} className="text-muted-foreground text-sm">
+                                    <span className="text-foreground font-medium">Option {opt.toUpperCase()}:</span> {why}
                                   </p>
                                 );
                               })}
@@ -506,17 +512,17 @@ export default function ResultsInner() {
 
                         {/* Elimination tip */}
                         {ans.questions?.elimination_tip && (
-                          <div className="bg-amber-950/20 rounded-xl p-4 border border-amber-900/30">
+                          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-5">
                             <p className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">🎯 Elimination Tip</p>
-                            <p className="text-zinc-400 text-sm">{ans.questions.elimination_tip}</p>
+                            <p className="text-muted-foreground text-sm">{ans.questions.elimination_tip}</p>
                           </div>
                         )}
 
                         {/* Static link */}
                         {ans.questions?.static_topic_link && (
-                          <div className="bg-blue-950/20 rounded-xl p-4 border border-blue-900/30">
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5">
                             <p className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">🔗 Static Connection</p>
-                            <p className="text-zinc-400 text-sm">{ans.questions.static_topic_link}</p>
+                            <p className="text-muted-foreground text-sm">{ans.questions.static_topic_link}</p>
                           </div>
                         )}
                       </div>

@@ -29,16 +29,16 @@ function StartModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+      <div className="bg-card shadow-surface shadow-surface rounded-2xl p-8 w-full max-w-md shadow-2xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">Start {subjectName} Practice</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+          <h2 className="text-xl font-display font-bold text-foreground">Start {subjectName} Practice</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Mode</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Mode</h3>
           <div className="grid grid-cols-2 gap-2">
             {(["practice", "test"] as const).map((m) => (
               <button
@@ -47,7 +47,7 @@ function StartModal({
                 className={`py-2 rounded-lg text-sm font-bold border transition-colors ${
                   mode === m
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-white/5 text-gray-300 border-white/10 hover:border-white/30"
+                    : "bg-secondary text-muted-foreground border-white/10 hover:border-white/30"
                 }`}
               >
                 {m === "practice" ? "Practice (Feedback)" : "Test (No Feedback)"}
@@ -57,7 +57,7 @@ function StartModal({
         </div>
 
         <div className="mb-8">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Question Count
           </h3>
           <div className="grid grid-cols-4 gap-2">
@@ -68,7 +68,7 @@ function StartModal({
                 className={`py-2 rounded-lg text-sm font-bold border transition-colors ${
                   count === n
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-white/5 text-gray-300 border-white/10 hover:border-white/30"
+                    : "bg-secondary text-muted-foreground border-white/10 hover:border-white/30"
                 }`}
               >
                 {n}
@@ -214,13 +214,13 @@ export default function PracticeTestsPage() {
       <ProtectedRoute>
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
           <aside className="w-full md:w-64 flex-shrink-0">
-            <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5 h-80 animate-pulse" />
+            <div className="bg-card shadow-surface rounded-xl p-5 h-80 animate-pulse" />
           </aside>
           <main className="flex-1">
-            <div className="h-16 bg-[#1a1a1a] rounded-xl mb-8 animate-pulse" />
+            <div className="h-16 bg-card shadow-surface rounded-xl mb-8 animate-pulse" />
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-[#1a1a1a] border border-white/5 rounded-xl p-6 h-64 animate-pulse" />
+                <div key={i} className="bg-card shadow-surface rounded-xl p-6 h-64 animate-pulse" />
               ))}
             </div>
           </main>
@@ -233,9 +233,9 @@ export default function PracticeTestsPage() {
     return (
       <ProtectedRoute>
         <div className="max-w-7xl mx-auto px-4 py-24 flex flex-col items-center justify-center text-center">
-          <span className="text-6xl mb-6">📚</span>
-          <h2 className="text-3xl font-bold text-white mb-2">Question bank is being built</h2>
-          <p className="text-gray-400 mb-8 max-w-md">
+          <span className="text-6xl mb-6 opacity-80">📚</span>
+          <h2 className="text-4xl font-display font-bold text-foreground mb-2">Question bank is being built</h2>
+          <p className="text-muted-foreground mb-8 max-w-md">
             Our team is adding questions. Check back soon or ask an admin to add questions.
           </p>
           <Link href="/" className="bg-primary text-primary-foreground px-8 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors">
@@ -273,10 +273,10 @@ export default function PracticeTestsPage() {
         {/* Main Content */}
         <main className="flex-1">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white tracking-tight">Practice Questions</h1>
-            <p className="text-gray-400 mt-2">
+            <h1 className="text-4xl font-display font-bold text-foreground tracking-tight">Practice Questions</h1>
+            <p className="text-muted-foreground mt-2">
               Master topics through targeted question banks.{" "}
-              <span className="text-gray-500">{visibleCards.length} subjects shown</span>
+              <span className="text-muted-foreground/70">{visibleCards.length} subjects shown</span>
             </p>
           </div>
 
@@ -284,26 +284,26 @@ export default function PracticeTestsPage() {
             {visibleCards.map((card) => (
               <div
                 key={card.id}
-                className="bg-[#1a1a1a] border border-white/5 rounded-xl p-6 flex flex-col hover:border-white/10 transition-colors"
+                className="bg-card shadow-surface rounded-xl p-6 flex flex-col hover:shadow-surface-hover transition-colors"
               >
                 <div className="flex justify-between items-start mb-6">
-                  <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
-                    <BookOpen className="w-5 h-5 text-gray-400" />
+                  <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center shadow-surface">
+                    <BookOpen className="w-5 h-5 text-muted-foreground" />
                   </div>
-                  <span className="text-xs font-medium bg-white/5 text-gray-300 px-3 py-1 rounded-full border border-white/10">
+                  <span className="text-xs font-medium bg-secondary text-muted-foreground px-3 py-1 rounded-full shadow-surface">
                     {card.name}
                   </span>
                 </div>
 
-                <h3 className="text-xl font-bold text-white mb-2 leading-tight">{card.name}</h3>
-                <p className="text-sm text-gray-400 mb-6 line-clamp-2">{card.desc}</p>
+                <h3 className="text-xl font-display font-bold text-foreground mb-2 leading-tight">{card.name}</h3>
+                <p className="text-sm text-muted-foreground mb-6 line-clamp-2">{card.desc}</p>
 
                 <div className="mt-auto">
                   <div className="flex justify-between text-xs font-medium mb-2">
-                    <span className="text-gray-500">Progress</span>
-                    <span className="text-white">{card.attempted} / {card.totalQs} Qs</span>
+                    <span className="text-muted-foreground/70">Progress</span>
+                    <span className="text-foreground">{card.attempted} / {card.totalQs} Qs</span>
                   </div>
-                  <div className="w-full h-1.5 bg-background rounded-full overflow-hidden mb-6 border border-white/5">
+                  <div className="w-full h-1.5 bg-background rounded-full overflow-hidden mb-6 shadow-surface">
                     <div
                       className="h-full bg-primary"
                       style={{
@@ -315,7 +315,7 @@ export default function PracticeTestsPage() {
                   {card.totalQs > 0 ? (
                     <button
                       onClick={() => setModalSubject(card.name)}
-                      className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-semibold bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors border border-primary/20"
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-semibold bg-primary text-primary-foreground shadow-surface hover:shadow-surface-hover hover:scale-[0.98] active:scale-95 ease-snappy transition-all transition-colors "
                     >
                       {card.attempted > 0 ? "Continue Practice" : "Start Practice"}
                       <ChevronRight className="w-4 h-4" />
@@ -323,7 +323,7 @@ export default function PracticeTestsPage() {
                   ) : (
                     <button
                       disabled
-                      className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-semibold bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed"
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-semibold bg-secondary text-muted-foreground/70 shadow-surface cursor-not-allowed"
                     >
                       0 questions available
                     </button>

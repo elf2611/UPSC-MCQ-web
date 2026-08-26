@@ -228,7 +228,7 @@ function AdminInner() {
       
       setAiGeneratedQuestions(validated);
     } catch (e: unknown) {
-      setValidationErrors([e instanceof Error ? e.message : "Invalid JSON format."]);
+      setValidationErrors([e instanceof Error ? e.message : "The JSON file you uploaded contains formatting errors. Please correct the syntax and upload it again."]);
     }
   };
 
@@ -324,9 +324,9 @@ function AdminInner() {
   return (
     <ProtectedRoute adminOnly>
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-white mb-8">Admin Dashboard</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8 text-balance">Admin Dashboard</h1>
 
-        <div className="flex flex-wrap gap-2 bg-white/5 p-1 rounded-lg w-fit mb-8 border border-white/10">
+        <div className="flex flex-wrap gap-2 bg-secondary p-1 rounded-lg w-fit mb-8 shadow-border">
           {[
             { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
             { id: "add", label: "Add Question", icon: PlusCircle },
@@ -339,7 +339,7 @@ function AdminInner() {
               key={t.id}
               onClick={() => setActiveTab(t.id as "dashboard" | "add" | "manage" | "subjects" | "generator" | "review")}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-gray-400 hover:text-white hover:bg-white/5"
+                activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
               }`}
             >
               <t.icon className="h-4 w-4" /> {t.label}
@@ -381,29 +381,29 @@ function AdminInner() {
         {/* ================= SUBJECTS & TOPICS ================= */}
         {activeTab === "subjects" && (
           <div className="space-y-8">
-            <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
-              <h2 className="text-xl font-semibold text-white mb-6">Add New Subject</h2>
+            <div className="bg-card shadow-border rounded-xl p-6 shadow-xl">
+              <h2 className="text-xl font-semibold text-foreground mb-6 text-balance">Add New Subject</h2>
               <form onSubmit={handleAddSubject} className="flex gap-4">
-                <input type="text" value={newSubName} onChange={e=>setNewSubName(e.target.value)} placeholder="Subject Name" required className="flex-1 bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white" />
-                <input type="color" value={newSubColor} onChange={e=>setNewSubColor(e.target.value)} className="w-12 h-12 p-1 rounded-lg bg-background border border-white/10 cursor-pointer" />
-                <input type="text" value={newSubIcon} onChange={e=>setNewSubIcon(e.target.value)} placeholder="Emoji (e.g. 📚)" required className="w-24 text-center bg-background border border-white/10 rounded-lg py-2.5 px-4 text-white" />
-                <button type="submit" className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-bold">Add Subject</button>
+                <input type="text" value={newSubName} onChange={e=>setNewSubName(e.target.value)} placeholder="Subject Name" required className="flex-1 bg-background shadow-border rounded-lg py-2.5 px-4 text-foreground" />
+                <input type="color" value={newSubColor} onChange={e=>setNewSubColor(e.target.value)} className="w-12 h-12 p-1 rounded-lg bg-background shadow-border cursor-pointer" />
+                <input type="text" value={newSubIcon} onChange={e=>setNewSubIcon(e.target.value)} placeholder="Emoji (e.g. 📚)" required className="w-24 text-center bg-background shadow-border rounded-lg py-2.5 px-4 text-foreground" />
+                <button type="submit" className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-bold min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0">Add Subject</button>
               </form>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {subjects.map(s => (
-                <div key={s.id as string} className="bg-[#1a1a1a] border border-white/10 rounded-xl p-5">
+                <div key={s.id as string} className="bg-card shadow-surface shadow-border rounded-xl p-5">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="text-2xl">{s.icon as string}</span>
-                    <h3 className="text-lg font-bold text-white" style={{color: s.color as string}}>{s.name as string}</h3>
+                    <h3 className="text-lg font-bold text-foreground" style={{color: s.color as string}}>{s.name as string}</h3>
                   </div>
                   
                   <div className="space-y-2 mb-4">
                     {topics.filter(t => t.subject_id === s.id).map(t => (
-                      <div key={t.id as string} className="flex flex-col bg-white/5 p-3 rounded-md">
+                      <div key={t.id as string} className="flex flex-col bg-secondary p-3 rounded-md">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium text-gray-300">{t.name as string}</span>
+                          <span className="font-medium text-muted-foreground">{t.name as string}</span>
                           <button onClick={() => handleDeleteTopic(t.id as string)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                         </div>
                         
@@ -411,14 +411,14 @@ function AdminInner() {
                         <div className="pl-4 border-l border-white/10 space-y-1 mt-1">
                           {subtopics.filter(st => st.topic_id === t.id).map(st => (
                             <div key={st.id as string} className="flex justify-between items-center py-1">
-                              <span className="text-xs text-gray-400">• {st.name as string}</span>
+                              <span className="text-xs text-muted-foreground">• {st.name as string}</span>
                               <button onClick={() => handleDeleteSubtopic(st.id as string)} className="text-red-500 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
                             </div>
                           ))}
                           
                           {addingSubtopicTo === t.id ? (
                             <div className="flex gap-2 mt-2">
-                              <input type="text" autoFocus value={newSubtopicName} onChange={e=>setNewSubtopicName(e.target.value)} className="flex-1 bg-background border border-white/10 rounded-md py-1 px-2 text-xs text-white" placeholder="Subtopic..." />
+                              <input type="text" autoFocus value={newSubtopicName} onChange={e=>setNewSubtopicName(e.target.value)} className="flex-1 bg-background shadow-border rounded-md py-1 px-2 text-xs text-foreground" placeholder="Subtopic..." />
                               <button onClick={() => handleAddSubtopic(t.id as string)} className="bg-green-500/20 text-green-400 px-2 py-1 rounded-md text-xs">Save</button>
                             </div>
                           ) : (
@@ -431,7 +431,7 @@ function AdminInner() {
 
                   {addingTopicTo === s.id ? (
                     <div className="flex gap-2">
-                      <input type="text" autoFocus value={newTopicName} onChange={e=>setNewTopicName(e.target.value)} className="flex-1 bg-background border border-white/10 rounded-md py-1.5 px-3 text-sm text-white" placeholder="Topic name..." />
+                      <input type="text" autoFocus value={newTopicName} onChange={e=>setNewTopicName(e.target.value)} className="flex-1 bg-background shadow-border rounded-md py-1.5 px-3 text-sm text-foreground" placeholder="Topic name..." />
                       <button onClick={() => handleAddTopic(s.id as string)} className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-md text-sm">Save</button>
                     </div>
                   ) : (
@@ -446,8 +446,8 @@ function AdminInner() {
         {/* ================= AI QUESTION STUDIO / IMPORT ================= */}
         {activeTab === "generator" && (
           <div className="space-y-8">
-            <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
-              <h2 className="text-xl font-semibold text-white mb-6">Import Questions</h2>
+            <div className="bg-card shadow-border rounded-xl p-6 shadow-xl">
+              <h2 className="text-xl font-semibold text-foreground mb-6 text-balance">Import Questions</h2>
               
               {validationErrors.length > 0 && (
                 <div className={`mb-6 p-4 rounded-xl border ${validationErrors[0]?.includes('scanned document') ? 'bg-amber-950 border-amber-700' : 'bg-amber-500/20 border-amber-500/50 text-amber-400'}`}>
@@ -464,13 +464,13 @@ function AdminInner() {
                           setCopied(true)
                           setTimeout(() => setCopied(false), 2000)
                         }}
-                        className="text-xs bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded mr-2"
+                        className="text-xs bg-amber-700 hover:bg-amber-600 text-foreground px-3 py-1.5 rounded mr-2"
                       >
                         {copied ? '✓ Copied!' : '📋 Copy Prompt'}
                       </button>
                       <button
                         onClick={() => setImportMethod('json')}
-                        className="text-xs bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1.5 rounded"
+                        className="text-xs bg-zinc-700 hover:bg-zinc-600 text-foreground px-3 py-1.5 rounded"
                       >
                         Go to Paste JSON tab →
                       </button>
@@ -505,7 +505,7 @@ function AdminInner() {
                     className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
                       importMethod === tab.id
                         ? "border-amber-500 text-amber-400"
-                        : "border-transparent text-gray-400 hover:text-white"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {tab.label}
@@ -517,13 +517,13 @@ function AdminInner() {
               {importMethod === "pdf" && (
                 <div className="space-y-6">
                   {/* AI Config for PDF background processing */}
-                  <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
-                    <h3 className="text-lg font-semibold text-white mb-4">Configuration (Optional)</h3>
+                  <div className="bg-card shadow-border rounded-xl p-6 shadow-xl">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Configuration (Optional)</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
-                      <div><label className="block text-xs text-gray-400 mb-1">Questions per chunk</label><select value={aiConfig.count} onChange={e=>setAiConfig({...aiConfig, count: Number(e.target.value)})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm"><option value="5">5</option><option value="10">10</option><option value="15">15</option></select></div>
-                      <div><label className="block text-xs text-gray-400 mb-1">Difficulty</label><select value={aiConfig.difficulty} onChange={e=>setAiConfig({...aiConfig, difficulty: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm"><option>Mixed</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
-                      <div><label className="block text-xs text-gray-400 mb-1">Subject</label><input type="text" value={aiConfig.subject} onChange={e=>setAiConfig({...aiConfig, subject: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm" /></div>
-                      <div><label className="block text-xs text-gray-400 mb-1">Topic</label><input type="text" value={aiConfig.topic} onChange={e=>setAiConfig({...aiConfig, topic: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm" /></div>
+                      <div><label className="block text-xs text-muted-foreground mb-1">Questions per chunk</label><select value={aiConfig.count} onChange={e=>setAiConfig({...aiConfig, count: Number(e.target.value)})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm"><option value="5">5</option><option value="10">10</option><option value="15">15</option></select></div>
+                      <div><label className="block text-xs text-muted-foreground mb-1">Difficulty</label><select value={aiConfig.difficulty} onChange={e=>setAiConfig({...aiConfig, difficulty: e.target.value})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm"><option>Mixed</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+                      <div><label className="block text-xs text-muted-foreground mb-1">Subject</label><input type="text" value={aiConfig.subject} onChange={e=>setAiConfig({...aiConfig, subject: e.target.value})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm" /></div>
+                      <div><label className="block text-xs text-muted-foreground mb-1">Topic</label><input type="text" value={aiConfig.topic} onChange={e=>setAiConfig({...aiConfig, topic: e.target.value})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm" /></div>
                     </div>
                   </div>
 
@@ -541,14 +541,14 @@ function AdminInner() {
                   <textarea 
                     value={aiSourceText} 
                     onChange={e => setAiSourceText(e.target.value)} 
-                    className="w-full h-40 bg-background border border-white/10 rounded-lg p-4 text-white" 
+                    className="w-full h-40 bg-background shadow-border rounded-lg p-4 text-foreground" 
                     placeholder="Paste your text or notes here to let AI generate questions..." 
                   />
                   <div className="flex justify-end">
                     <button 
                       onClick={handleExtractContext} 
                       disabled={!aiSourceText.trim()} 
-                      className="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
+                      className="bg-secondary/80 hover:bg-white/20 text-foreground px-6 py-2 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
                     >
                       Step 1: Extract & Preview Content
                     </button>
@@ -576,25 +576,25 @@ function AdminInner() {
                           setCopied(true)
                           setTimeout(() => setCopied(false), 2000)
                         }}
-                        className="text-xs bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded mt-3"
+                        className="text-xs bg-amber-700 hover:bg-amber-600 text-foreground px-3 py-1.5 rounded mt-3"
                       >
                         {copied ? '✓ Copied!' : '📋 Copy Prompt'}
                       </button>
                     </div>
                   </details>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     Paste an array of questions in JSON format. The system will automatically validate the schema and fill in missing fields with defaults.
                   </p>
                   <textarea 
                     value={jsonText} 
                     onChange={e => setJsonText(e.target.value)} 
-                    className="w-full h-64 bg-background border border-white/10 rounded-lg p-4 text-white font-mono text-sm" 
+                    className="w-full h-64 bg-background shadow-border rounded-lg p-4 text-foreground font-mono text-sm" 
                     placeholder={'[\n  {\n    "question_text": "...",\n    "option_a": "...",\n    "option_b": "...",\n    "option_c": "...",\n    "option_d": "...",\n    "correct_option": "A"\n  }\n]'} 
                   />
                   <div className="flex justify-end">
                     <button 
                       onClick={handleValidateJson} 
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-semibold flex items-center gap-2"
+                      className="bg-primary text-primary-foreground hover:scale-[0.98] active:scale-95 ease-snappy shadow-surface-glow px-6 py-2 rounded-lg font-semibold flex items-center gap-2 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
                     >
                       Validate JSON
                     </button>
@@ -605,23 +605,23 @@ function AdminInner() {
 
             {/* Step 2 AI Configuration (Only for Text) */}
             {importMethod === "text" && aiExtractedContext !== "" && (
-              <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
-                <h3 className="text-lg font-semibold text-white mb-4">Step 2: Refine Context & Configure AI</h3>
+              <div className="bg-card shadow-border rounded-xl p-6 shadow-xl">
+                <h3 className="text-lg font-semibold text-foreground mb-4">Step 2: Refine Context & Configure AI</h3>
                 <textarea 
                   value={aiExtractedContext} 
                   onChange={e => setAiExtractedContext(e.target.value)} 
-                  className="w-full h-48 bg-background border border-white/10 rounded-lg p-4 text-gray-300 text-sm mb-6 font-mono" 
+                  className="w-full h-48 bg-background shadow-border rounded-lg p-4 text-muted-foreground text-sm mb-6 font-mono" 
                 />
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div><label className="block text-xs text-gray-400 mb-1">Questions</label><select value={aiConfig.count} onChange={e=>setAiConfig({...aiConfig, count: Number(e.target.value)})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm"><option value="5">5</option><option value="10">10</option><option value="15">15</option></select></div>
-                  <div><label className="block text-xs text-gray-400 mb-1">Difficulty</label><select value={aiConfig.difficulty} onChange={e=>setAiConfig({...aiConfig, difficulty: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm"><option>Mixed</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
-                  <div><label className="block text-xs text-gray-400 mb-1">Subject</label><input type="text" value={aiConfig.subject} onChange={e=>setAiConfig({...aiConfig, subject: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm" /></div>
-                  <div><label className="block text-xs text-gray-400 mb-1">Topic</label><input type="text" value={aiConfig.topic} onChange={e=>setAiConfig({...aiConfig, topic: e.target.value})} className="w-full bg-background border border-white/10 rounded text-white p-2 text-sm" /></div>
+                  <div><label className="block text-xs text-muted-foreground mb-1">Questions</label><select value={aiConfig.count} onChange={e=>setAiConfig({...aiConfig, count: Number(e.target.value)})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm"><option value="5">5</option><option value="10">10</option><option value="15">15</option></select></div>
+                  <div><label className="block text-xs text-muted-foreground mb-1">Difficulty</label><select value={aiConfig.difficulty} onChange={e=>setAiConfig({...aiConfig, difficulty: e.target.value})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm"><option>Mixed</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+                  <div><label className="block text-xs text-muted-foreground mb-1">Subject</label><input type="text" value={aiConfig.subject} onChange={e=>setAiConfig({...aiConfig, subject: e.target.value})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm" /></div>
+                  <div><label className="block text-xs text-muted-foreground mb-1">Topic</label><input type="text" value={aiConfig.topic} onChange={e=>setAiConfig({...aiConfig, topic: e.target.value})} className="w-full bg-background shadow-border rounded text-foreground p-2 text-sm" /></div>
                 </div>
 
                 <div className="flex justify-end">
-                  <button onClick={handleGenerateQuestions} disabled={aiGenerating} className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-semibold flex items-center gap-2">
+                  <button onClick={handleGenerateQuestions} disabled={aiGenerating} className="bg-primary text-primary-foreground hover:scale-[0.98] active:scale-95 ease-snappy shadow-surface-glow px-6 py-2 rounded-lg font-semibold flex items-center gap-2 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0">
                     <Brain className="w-4 h-4" /> {aiGenerating ? "Generating MCQs (this takes time)..." : "Step 3: Generate MCQs"}
                   </button>
                 </div>
@@ -655,22 +655,22 @@ function AdminInner() {
 
             {/* Table Preview */}
             {aiGeneratedQuestions.length > 0 && (
-              <div className="bg-card border border-white/10 rounded-xl p-6 shadow-xl">
+              <div className="bg-card shadow-border rounded-xl p-6 shadow-xl">
                 <div className="flex justify-between items-center mb-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Preview & Edit</h3>
-                    <p className="text-sm text-gray-400">{aiGeneratedQuestions.length} questions ready to import</p>
+                    <h3 className="text-lg font-semibold text-foreground">Preview & Edit</h3>
+                    <p className="text-sm text-muted-foreground">{aiGeneratedQuestions.length} questions ready to import</p>
                   </div>
                   <div className="flex gap-4">
                     <button 
                       onClick={() => setAiGeneratedQuestions([])} 
-                      className="border border-white/20 hover:bg-white/10 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                      className="shadow-surface-hover hover:bg-secondary/80 text-foreground px-6 py-2 rounded-lg font-semibold transition-colors"
                     >
                       Clear & Start Over
                     </button>
                     <button 
                       onClick={handleBulkSave} 
-                      className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] transition-all"
+                      className="bg-amber-500 hover:bg-amber-600 text-foreground px-6 py-2 rounded-lg font-semibold flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
                     >
                       <Save className="w-4 h-4" /> Save All to Database
                     </button>
@@ -681,12 +681,12 @@ function AdminInner() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-white/10">
-                        <th className="pb-3 text-sm font-medium text-gray-400">#</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400">Question</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400">Subject</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400">Diff</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400 text-center">Ans</th>
-                        <th className="pb-3 text-sm font-medium text-gray-400 text-right">Remove</th>
+                        <th className="pb-3 text-sm font-medium text-muted-foreground">#</th>
+                        <th className="pb-3 text-sm font-medium text-muted-foreground">Question</th>
+                        <th className="pb-3 text-sm font-medium text-muted-foreground">Subject</th>
+                        <th className="pb-3 text-sm font-medium text-muted-foreground">Diff</th>
+                        <th className="pb-3 text-sm font-medium text-muted-foreground text-center">Ans</th>
+                        <th className="pb-3 text-sm font-medium text-muted-foreground text-right">Remove</th>
                       </tr>
                     </thead>
                     <tbody className="text-sm">
@@ -706,13 +706,13 @@ function AdminInner() {
 
                         return (
                         <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                          <td className="py-4 text-gray-400">{idx + 1}</td>
+                          <td className="py-4 text-muted-foreground">{idx + 1}</td>
                           <td className="py-4 pr-4">
-                            <div className="max-w-md truncate text-gray-300">
+                            <div className="max-w-md truncate text-muted-foreground">
                               {q.question_text as string}
                             </div>
                           </td>
-                          <td className="py-4 pr-4 text-gray-300">
+                          <td className="py-4 pr-4 text-muted-foreground">
                             {q.subject as string}
                           </td>
                           <td className="py-4 pr-4">
@@ -735,13 +735,13 @@ function AdminInner() {
                                   } as unknown as QuestionFormValues);
                                   setActiveTab("add");
                                 }}
-                                className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+                                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary/80 rounded-md transition-colors"
                               >
                                 <Pencil className="h-4 w-4" />
                               </button>
                               <button 
                                 onClick={() => { const copy = [...aiGeneratedQuestions]; copy.splice(idx, 1); setAiGeneratedQuestions(copy); }}
-                                className="p-1.5 text-red-400 hover:text-white hover:bg-red-500 rounded-md transition-colors"
+                                className="p-1.5 text-red-400 hover:text-foreground hover:bg-red-500 rounded-md transition-colors"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>

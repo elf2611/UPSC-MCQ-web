@@ -77,7 +77,7 @@ function Chip({
       className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-150 whitespace-nowrap ${
         active
           ? activeClass
-          : "bg-white/5 text-gray-400 border-white/10 hover:border-white/30 hover:text-white"
+          : "bg-secondary text-muted-foreground border-white/10 hover:border-white/30 hover:text-foreground"
       }`}
     >
       {label}
@@ -104,13 +104,13 @@ function Section({
         className="flex items-center justify-between w-full text-left"
         onClick={() => setOpen((p) => !p)}
       >
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
           {title}
         </span>
         {open ? (
-          <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+          <ChevronUp className="w-3.5 h-3.5 text-muted-foreground/70" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/70" />
         )}
       </button>
       {open && <div className="mt-3">{children}</div>}
@@ -234,19 +234,19 @@ export function QuestionFilterPanel({
 
   if (loading) {
     return (
-      <div className="bg-[#1a1a1a] border border-white/5 rounded-xl p-5 animate-pulse h-80" />
+      <div className="bg-card shadow-surface rounded-xl p-5 animate-pulse h-80" />
     );
   }
 
   return (
-    <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden">
+    <div className="bg-card shadow-surface rounded-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-        <h3 className="text-sm font-semibold text-white">Filters</h3>
+        <h3 className="text-sm font-semibold text-foreground">Filters</h3>
         {hasActiveFilters && (
           <button
             onClick={reset}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-foreground transition-colors"
           >
             <RotateCcw className="w-3 h-3" />
             Reset
@@ -258,20 +258,20 @@ export function QuestionFilterPanel({
 
         {/* Stats Card */}
         {stats && (
-          <div className="mt-4 mb-2 grid grid-cols-3 gap-2 bg-white/[0.03] border border-white/5 rounded-lg p-3">
+          <div className="mt-4 mb-2 grid grid-cols-3 gap-2 bg-white/[0.03] shadow-surface rounded-lg p-3">
             <div className="text-center">
-              <div className="text-lg font-bold text-white">{stats.total}</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Total</div>
+              <div className="text-lg font-display font-bold text-foreground">{stats.total}</div>
+              <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Total</div>
             </div>
             <div className="text-center border-x border-white/5">
               <div className="text-lg font-bold text-emerald-400">{stats.solved}</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Solved</div>
+              <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Solved</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-amber-400">
                 {stats.accuracy > 0 ? `${Math.round(stats.accuracy)}%` : "—"}
               </div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Accuracy</div>
+              <div className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">Accuracy</div>
             </div>
           </div>
         )}
@@ -279,13 +279,13 @@ export function QuestionFilterPanel({
         {/* Search */}
         <Section title="Search Keywords">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/70" />
             <input
               type="text"
               placeholder="Search questions..."
               value={filters.search}
               onChange={(e) => set({ search: e.target.value })}
-              className="w-full bg-background border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary/50"
+              className="w-full bg-background shadow-surface rounded-lg py-2 pl-9 pr-3 text-sm text-foreground placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary/50"
             />
           </div>
         </Section>
@@ -458,10 +458,10 @@ export function QuestionFilterPanel({
               onClick={() => set({ bookmarkedOnly: !filters.bookmarkedOnly })}
             >
               {filters.bookmarkedOnly && (
-                <BookmarkCheck className="w-3 h-3 text-white" />
+                <BookmarkCheck className="w-3 h-3 text-foreground" />
               )}
             </div>
-            <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
+            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
               Bookmarked Only
             </span>
           </label>
