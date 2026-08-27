@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Plus_Jakarta_Sans, Outfit } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
 import { Navbar } from "@/components/navbar";
 import { ScrollToTop } from "@/components/scroll-to-top";
 
-const inter = Inter({ 
+const sans = Plus_Jakarta_Sans({ 
   subsets: ["latin"],
   variable: "--font-sans",
 });
 
-const spaceGrotesk = Space_Grotesk({
+const display = Outfit({
   subsets: ["latin"],
   variable: "--font-display",
 });
@@ -27,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark overflow-x-hidden">
-      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[#0B0B0F] text-gray-200`}>
+      <body className={`${sans.variable} ${display.variable} font-sans antialiased bg-[#0B0B0F] text-gray-200`}>
         <a 
           href="#main-content" 
           className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#121212] focus:ring-primary"
