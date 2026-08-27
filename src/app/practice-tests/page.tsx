@@ -26,7 +26,7 @@ function StartModal({
   onStart: (cfg: { mode: string; count: number }) => void;
   subjectName: string;
 }) {
-  const [mode, setMode] = useState<"practice" | "test">("practice");
+  const [mode, setMode] = useState<"practice" | "adaptive" | "test">("practice");
   const [count, setCount] = useState(20);
 
   return (
@@ -41,8 +41,8 @@ function StartModal({
 
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Mode</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {(["practice", "test"] as const).map((m) => (
+          <div className="grid grid-cols-3 gap-2">
+            {(["practice", "adaptive", "test"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
@@ -52,7 +52,7 @@ function StartModal({
                     : "bg-secondary text-muted-foreground border-white/10 hover:border-white/30"
                 }`}
               >
-                {m === "practice" ? "Practice (Feedback)" : "Test (No Feedback)"}
+                {m === "practice" ? "Practice" : m === "adaptive" ? "Adaptive" : "Test (No Feedback)"}
               </button>
             ))}
           </div>

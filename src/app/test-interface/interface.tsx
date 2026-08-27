@@ -120,7 +120,7 @@ export default function TestInterfaceInner() {
           data = resData.questions;
         }
 
-        if (mode === "practice" || mode === "test") {
+        if (mode === "practice" || mode === "test" || mode === "adaptive") {
           setTestName(subtopic ? `${subtopic} Practice` : topic ? `${topic} Practice` : `${subject} Practice`);
           setTimeLeft(3600);
         } else if (mode === "mock" && testId) {
@@ -359,7 +359,7 @@ export default function TestInterfaceInner() {
     const selectedLower = option.toLowerCase().trim();
     setAnswers(prev => ({ ...prev, [currentQ.id]: selectedLower }));
     
-    if (mode === 'practice') {
+    if (mode === 'practice' || mode === 'adaptive') {
       setIsVerifying(true);
       try {
         const token = await user?.getIdToken();
@@ -413,7 +413,7 @@ export default function TestInterfaceInner() {
     if (!currentQ) return;
     if (answers[currentQ.id]) setQuestionStatus(prev => ({ ...prev, [currentQ.id]: "answered" }));
     
-    if (mode === "practice" && !feedbackMode && answers[currentQ.id]) {
+    if ((mode === "practice" || mode === "adaptive") && !feedbackMode && answers[currentQ.id]) {
       // Trigger feedback panel instead of moving
       setFeedbackMode(true);
       return;
@@ -615,7 +615,7 @@ export default function TestInterfaceInner() {
               </div>
 
               {/* Feedback Panels */}
-              {mode === 'practice' && feedbackMode && (
+              {(mode === 'practice' || mode === 'adaptive') && feedbackMode && (
                 <div className="flex flex-col gap-4 mt-4 animate-in slide-in-from-bottom-4 fade-in duration-300">
                   {/* Panel 1: Result */}
                   <div className={`p-4 rounded-xl border ${isCorrect ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
@@ -681,7 +681,7 @@ export default function TestInterfaceInner() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3 items-center justify-between flex-shrink-0 pt-4 pb-10">
-                {!(mode === 'practice' && feedbackMode) ? (
+                {!((mode === 'practice' || mode === 'adaptive') && feedbackMode) ? (
                   <>
                     <div className="flex gap-2 flex-wrap">
                       <button onClick={handleMarkForReview} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors">
@@ -697,7 +697,7 @@ export default function TestInterfaceInner() {
                       </button>
                       {currentIndex < questions.length - 1 ? (
                         <button onClick={handleSaveAndNext} className="flex items-center gap-1 px-6 py-2 rounded-lg text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                          {mode === 'practice' && answers[currentQ.id] ? 'Check Answer' : 'Save & Next'} <ChevronRight className="w-4 h-4" />
+                          {(mode === 'practice' || mode === 'adaptive') && answers[currentQ.id] ? 'Check Answer' : 'Save & Next'} <ChevronRight className="w-4 h-4" />
                         </button>
                       ) : (
                         <button onClick={handleSubmit} className="flex items-center gap-1 px-6 py-2 rounded-lg text-sm font-bold bg-green-600 text-foreground hover:bg-green-700 transition-colors">

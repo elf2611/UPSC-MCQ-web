@@ -13,6 +13,12 @@ export async function POST(request: NextRequest) {
     const { mode, subject, topic, subtopic, difficulty, testId, customCount, date, year } = await request.json();
     const supabaseAdmin = getSupabaseAdmin();
 
+    let abilityScore = 1200.0;
+    if (mode === 'adaptive') {
+      const { data: stats } = await supabaseAdmin.from('user_statistics').select('rolling_ability_score').eq('user_id', authResult.uid).eq('subject_id', subject).single();
+      if (stats?.rolling_ability_score) abilityScore = stats.rolling_ability_score;
+    }
+
     let limit = 10;
     if (mode === "mock" && testId) {
       limit = 100;
@@ -33,7 +39,8 @@ export async function POST(request: NextRequest) {
       p_year: year || null,
       p_date: date || null,
       p_mode: mode || 'practice',
-      p_limit: limit
+      p_limit: limit,
+      p_ability_score: abilityScore
     }).select("id, subject_id, subject, topic, subtopic, question_text, option_a, option_b, option_c, option_d, difficulty, year");
 
     if (error) throw new Error(error.message);
