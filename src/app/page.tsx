@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, ChevronDown, Clock, Target, BarChart3, Newspaper, ShieldCheck, Trophy, Quote, PlayCircle, TrendingUp, Search, History } from "lucide-react";
+import { CheckCircle2, TrendingUp, Clock, Target, PlayCircle, ArrowRight, BrainCircuit, BarChart3, ChevronDown, ShieldCheck, History, Newspaper, Trophy, MessageSquareText, PenTool, Users, FileSignature, Quote, Search } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 // --- HOOKS ---
@@ -273,33 +273,50 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
               <Newspaper className="w-8 h-8 text-primary mb-5" />
-              <h3 className="text-lg font-bold font-display text-foreground mb-2">Retain what matters</h3>
-              <p className="text-muted-foreground">Daily AI MCQs from current affairs so you stay updated without drowning in newspapers.</p>
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Daily AI MCQs</h3>
+              <p className="text-muted-foreground">Fresh questions generated daily from current affairs so you stay updated effortlessly.</p>
+            </div>
+            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+              <PenTool className="w-8 h-8 text-primary mb-5" />
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Mains Answer Writing</h3>
+              <p className="text-muted-foreground">Distraction-free Mains editor with strict timers and instant, rubric-based AI scoring.</p>
+            </div>
+            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors relative overflow-hidden">
+              <div className="absolute top-0 right-0 px-2 py-1 bg-amber-500/20 text-amber-500 text-[10px] font-bold uppercase rounded-bl-lg">Elite</div>
+              <MessageSquareText className="w-8 h-8 text-primary mb-5" />
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">AI Interview Board</h3>
+              <p className="text-muted-foreground">Simulate UPSC Board Questions and get AI-powered feedback on structure and confidence.</p>
+            </div>
+            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+              <Users className="w-8 h-8 text-primary mb-5" />
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Cohort Leaderboards</h3>
+              <p className="text-muted-foreground">Join a target-year cohort (e.g. UPSC 2026). Earn XP and compete in the Weekly Top 50.</p>
+            </div>
+            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+              <FileSignature className="w-8 h-8 text-primary mb-5" />
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Progress Contracts</h3>
+              <p className="text-muted-foreground">Sign accountability contracts (e.g., &quot;500 Qs in 30 Days&quot;) and track your milestones daily.</p>
+            </div>
+            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors relative overflow-hidden">
+              <div className="absolute top-0 right-0 px-2 py-1 bg-primary/20 text-primary text-[10px] font-bold uppercase rounded-bl-lg">Pro</div>
+              <BrainCircuit className="w-8 h-8 text-primary mb-5" />
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Doubt-Solving AI</h3>
+              <p className="text-muted-foreground">Get instant, context-aware answers to tricky options from our grounded UPSC AI tutor.</p>
             </div>
             <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
               <Clock className="w-8 h-8 text-primary mb-5" />
-              <h3 className="text-lg font-bold font-display text-foreground mb-2">Build stamina</h3>
-              <p className="text-muted-foreground">Full-length mocks that strictly train your speed, accuracy, and mental stamina for the 2-hour window.</p>
-            </div>
-            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
-              <Target className="w-8 h-8 text-primary mb-5" />
-              <h3 className="text-lg font-bold font-display text-foreground mb-2">Stop guessing</h3>
-              <p className="text-muted-foreground">Weak-subject insights so you stop guessing what to study next and focus on exactly where you bleed marks.</p>
-            </div>
-            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
-              <ShieldCheck className="w-8 h-8 text-primary mb-5" />
-              <h3 className="text-lg font-bold font-display text-foreground mb-2">Avoid common traps</h3>
-              <p className="text-muted-foreground">Elimination tips and explicit &quot;why wrong&quot; breakdowns immediately after every question.</p>
-            </div>
-            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
-              <BarChart3 className="w-8 h-8 text-primary mb-5" />
-              <h3 className="text-lg font-bold font-display text-foreground mb-2">Track real progress</h3>
-              <p className="text-muted-foreground">Score trajectory charts to visually see your accuracy and progress week over week.</p>
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Pacing Analytics</h3>
+              <p className="text-muted-foreground">Compare your speed-per-question against global benchmarks to fix your exam timing.</p>
             </div>
             <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
               <History className="w-8 h-8 text-primary mb-5" />
-              <h3 className="text-lg font-bold font-display text-foreground mb-2">Fix mistakes forever</h3>
-              <p className="text-muted-foreground">Revision queue acts as a smart inbox for marked/wrong questions using spaced-repetition.</p>
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Auto-Revision Queue</h3>
+              <p className="text-muted-foreground">Our engine auto-queues stale topics and repeated mistakes for spaced-repetition.</p>
+            </div>
+            <div className="bg-card shadow-surface p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+              <Target className="w-8 h-8 text-primary mb-5" />
+              <h3 className="text-lg font-bold font-display text-foreground mb-2">Adaptive Difficulty</h3>
+              <p className="text-muted-foreground">Questions scale automatically based on your rolling Elo ability score to keep you challenged.</p>
             </div>
           </div>
         </div>
@@ -351,10 +368,11 @@ export default function HomePage() {
               <p className="text-xs text-green-400 font-bold uppercase tracking-wider mb-8">Save ₹989/yr vs monthly</p>
               
               <ul className="space-y-4 mb-8">
-                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Unlimited Mock & Practice Tests</li>
-                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Advanced Score Analytics</li>
-                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Spaced Revision Queue</li>
-                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Daily AI Current Affairs MCQs</li>
+                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> AI Mains Answer Scoring</li>
+                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Elite Mock Interview Simulator</li>
+                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> AI Doubt-Solving Chat</li>
+                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Optional Subjects Test Series</li>
+                <li className="flex items-center text-foreground font-medium"><CheckCircle2 className="w-5 h-5 text-primary mr-3 flex-shrink-0" /> Unlimited MCQs & Spaced Revision</li>
               </ul>
               <Link href="/signup" className="block text-center w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold font-display hover:bg-primary/90 transition-transform active:scale-95 ease-snappy shadow-[0_0_20px_rgba(255,191,0,0.2)]">
                 Start 7-Day Free Trial
