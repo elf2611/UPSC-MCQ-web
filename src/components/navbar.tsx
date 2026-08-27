@@ -20,6 +20,7 @@ export function Navbar() {
     { name: "PYQs", href: "/pyq-tests" },
     { name: "Revision", href: "/revision", isRevision: true },
     { name: "Performance", href: "/performance" },
+    { name: "Leaderboard", href: "/leaderboard" },
     { name: "Pricing", href: "/pricing" },
     { name: "Current Affairs", href: "/current-affairs" },
   ];
