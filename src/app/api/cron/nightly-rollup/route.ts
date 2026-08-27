@@ -226,6 +226,11 @@ export async function GET(req: NextRequest) {
 
 
 
+    
+    // Feature 8: Timed Sectional Pacing Analytics
+    // Let Postgres handle the heavy aggregation
+    await supabaseAdmin.rpc('refresh_pacing_benchmarks');
+
     return NextResponse.json({ success: true, message: "Rollup completed." });
   } catch (error: any) {
     console.error("Nightly Rollup Error:", error);
