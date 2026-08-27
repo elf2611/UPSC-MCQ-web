@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import ProtectedRoute from "@/components/protected-route";
+import { ProtectedRoute } from "@/components/protected-route";
 import { Clock, ArrowLeft, Send, CheckCircle2, Loader2, LayoutTemplate } from "lucide-react";
 import Link from "next/link";
 

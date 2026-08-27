@@ -1,6 +1,6 @@
 "use client";
 
-import ProtectedRoute from "@/components/protected-route";
+import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect } from "react";
 import { 
   Inbox, Calendar, AlertTriangle, ArrowRight, BrainCircuit, Loader2, BookOpen, Clock
@@ -49,8 +49,8 @@ export default function RevisionInboxPage() {
               question_id: row.question_id as string,
               source: row.source || 'manual',
               next_review_date: row.next_review_date,
-              question_text: row.questions.question_text,
-              subject: row.questions.subject
+              question_text: (row.questions as any).question_text || (row.questions as any)[0]?.question_text,
+              subject: (row.questions as any).subject || (row.questions as any)[0]?.subject
             };
             if (item.source === 'manual') manual.push(item);
             else auto.push(item);

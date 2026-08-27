@@ -12,7 +12,6 @@ interface Message {
 
 export function DoubtChatWidget({ questionId }: { questionId?: string }) {
   const { user } = useAuth();
-  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");

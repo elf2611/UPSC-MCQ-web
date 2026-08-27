@@ -1,7 +1,7 @@
 
 import Link from "next/link";
 import { PenTool, Clock, Award } from "lucide-react";
-import ProtectedRoute from "@/components/protected-route";
+import { ProtectedRoute } from "@/components/protected-route";
 
 export default function MainsPracticePage() {
   const dummyQuestions = [

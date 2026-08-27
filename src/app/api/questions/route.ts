@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       const { data: revData } = await query;
       if (revData && revData.length > 0) {
         const qIds = revData.map(r => r.question_id);
-        const { data: qData } = await supabaseAdmin.from('questions').select("id, subject_id, subject, topic, subtopic, question_text, option_a, option_b, option_c, option_d, difficulty, year").in('id', qIds).limit(limit);
+        const { data: qData } = await supabaseAdmin.from('questions').select("id, subject_id, subject, topic, subtopic, question_text, option_a, option_b, option_c, option_d, difficulty, year").in('id', qIds).limit(10);
         return NextResponse.json({ questions: qData || [] });
       } else {
         return NextResponse.json({ questions: [] });

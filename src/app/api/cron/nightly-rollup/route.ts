@@ -36,8 +36,8 @@ export async function GET(req: NextRequest) {
       // We need current scores to compute deltas
       // For a real production system with thousands of users, we'd do this in batches or via SQL directly.
       // Doing it via Edge function for simplicity.
-      const userIds = [...new Set(attempts.map(a => a.user_id))];
-      const questionIds = [...new Set(attempts.map(a => a.question_id))];
+      const userIds = Array.from(new Set(attempts.map(a => a.user_id)));
+      const questionIds = Array.from(new Set(attempts.map(a => a.question_id)));
 
       const { data: userStats } = await supabaseAdmin
         .from('user_statistics')
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       });
 
       // Update Database
-      for (const [key, score] of abilityMap.entries()) {
+      for (const [key, score] of Array.from(abilityMap.entries())) {
         const [userId, subjectId] = key.split('_');
         if (!subjectId || subjectId === 'undefined') continue;
         await supabaseAdmin
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
           .match({ user_id: userId, subject_id: subjectId });
       }
 
-      for (const [qId, score] of difficultyMap.entries()) {
+      for (const [qId, score] of Array.from(difficultyMap.entries())) {
         await supabaseAdmin
           .from('questions')
           .update({ difficulty_rating: Math.round(score) })

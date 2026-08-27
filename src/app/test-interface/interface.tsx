@@ -780,7 +780,7 @@ export default function TestInterfaceInner() {
         </div>
       )}
 
-      <DoubtChatWidget questionId={questions[currentQuestionIndex]?.id} />
+      <DoubtChatWidget questionId={questions[currentIndex]?.id} />
     </div>
   );
 }
