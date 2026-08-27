@@ -1,5 +1,7 @@
 "use client";
 
+import { StudyPlanCard } from "@/components/ui/study-plan-card";
+
 import { ProtectedRoute } from "@/components/protected-route";
 import { useState, useEffect, useMemo } from "react";
 import { BookOpen, ChevronRight, X } from "lucide-react";
@@ -272,6 +274,7 @@ export default function PracticeTestsPage() {
 
         {/* Main Content */}
         <main className="flex-1">
+          <StudyPlanCard />
           <div className="mb-8">
             <h1 className="text-4xl font-display font-bold text-foreground tracking-tight">Practice Questions</h1>
             <p className="text-muted-foreground mt-2">
