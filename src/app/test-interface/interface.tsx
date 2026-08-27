@@ -1,5 +1,7 @@
 "use client";
 
+import { DoubtChatWidget } from "@/components/doubt-chat";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -777,6 +779,8 @@ export default function TestInterfaceInner() {
           <span className="font-bold text-sm">{toastMessage.message}</span>
         </div>
       )}
+
+      <DoubtChatWidget questionId={questions[currentQuestionIndex]?.id} />
     </div>
   );
 }

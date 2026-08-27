@@ -207,3 +207,23 @@ export async function verifyAdminToken(request: NextRequest): Promise<AdminVerif
   logger.info({ event_type: 'admin_verify_ok', route, uid, method: 'db_role' });
   return { ok: true, uid, email: profile.email ?? tokenEmail ?? '' };
 }
+
+/**
+ * Get the subscription tier/plan for a given user ID.
+ * Defaults to 'free' if profile not found.
+ */
+export async function getUserTier(uid: string): Promise<string> {
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles')
+    .select('plan')
+    .eq('id', uid)
+    .single();
+
+  if (error || !profile) {
+    logger.warn({ event_type: 'get_user_tier_fail', uid, reason: error?.message || 'no_profile' });
+    return 'free';
+  }
+
+  return profile.plan || 'free';
+}
