@@ -35,11 +35,7 @@ CREATE POLICY "Anyone can view mains questions"
   FOR SELECT
   USING (true);
 
-CREATE POLICY "Users can manage their own mains answers"
-  ON mains_answers
-  FOR ALL
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_mains_questions_paper ON mains_questions(paper);

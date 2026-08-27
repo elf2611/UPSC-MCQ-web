@@ -24,29 +24,9 @@ CREATE TABLE IF NOT EXISTS study_plan_days (
 ALTER TABLE study_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE study_plan_days ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can manage their own study plans"
-  ON study_plans
-  FOR ALL
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
 
-CREATE POLICY "Users can manage their own study plan days"
-  ON study_plan_days
-  FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM study_plans
-      WHERE study_plans.id = study_plan_days.plan_id
-      AND study_plans.user_id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM study_plans
-      WHERE study_plans.id = study_plan_days.plan_id
-      AND study_plans.user_id = auth.uid()
-    )
-  );
+
+
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_study_plans_user_id ON study_plans(user_id);
