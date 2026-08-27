@@ -15,6 +15,7 @@ export function Navbar() {
     { name: "Home", href: "/" },
     { name: "Practice", href: "/practice-tests" },
     { name: "Mocks", href: "/mock-tests" },
+    { name: "Mains", href: "/mains-practice" },
     { name: "PYQs", href: "/pyq-tests" },
     { name: "Revision", href: "/revision", isRevision: true },
     { name: "Performance", href: "/performance" },
