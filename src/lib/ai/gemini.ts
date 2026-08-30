@@ -1,3 +1,5 @@
+import { ExplainRequestPayload, DetailedExplanation } from "./explain-types";
+
 import { GenerateRequestPayload, GeneratedQuestion } from "./types";
 import { buildPrompt } from "./prompts";
 
@@ -125,4 +127,54 @@ export async function callGemini(payload: GenerateRequestPayload): Promise<Gener
   }
 
   throw lastError;
+}
+
+
+export async function generateExplanationGemini(payload: ExplainRequestPayload): Promise<DetailedExplanation> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+  const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+  const prompt = `
+You are an expert UPSC mentor. Provide a detailed explanation for this MCQ.
+Question: ${payload.question_text}
+A) ${payload.option_a}
+B) ${payload.option_b}
+C) ${payload.option_c}
+D) ${payload.option_d}
+
+Correct Answer is: ${payload.correct_option}
+
+Return ONLY a JSON object with this exact structure:
+{
+  "correct_explanation": "Detailed reason why ${payload.correct_option} is correct",
+  "why_others_wrong": {
+    "Option 1": "Why this is wrong",
+    "Option 2": "Why this is wrong",
+    "Option 3": "Why this is wrong"
+  },
+  "elimination_technique": "How a student could have guessed this using elimination logic",
+  "memory_trick": "A short mnemonic or trick to remember this fact"
+}
+`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
+    })
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) throw new Error("GEMINI_RATE_LIMIT");
+    throw new Error(`Gemini Error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const cleanText = sanitizeJSON(rawText);
+  return JSON.parse(cleanText) as DetailedExplanation;
 }

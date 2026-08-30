@@ -11,6 +11,7 @@ import {
 import { XCircle } from "lucide-react";
 import React from "react";
 import Link from "next/link";
+import { AIExplanationButton } from "@/components/ui/ai-explanation-button";
 
 function AnimatedCounter({ value, decimals = 0 }: { value: number; decimals?: number }) {
   const [count, setCount] = React.useState(0);
@@ -524,6 +525,17 @@ export default function ResultsInner() {
                             <p className="text-muted-foreground text-sm">{ans.questions.static_topic_link}</p>
                           </div>
                         )}
+                        
+                        {/* AI Explanation Button */}
+                        <AIExplanationButton questionData={{
+                          question_text: ans.questions?.question_text || "",
+                          option_a: ans.questions?.option_a || "",
+                          option_b: ans.questions?.option_b || "",
+                          option_c: ans.questions?.option_c || "",
+                          option_d: ans.questions?.option_d || "",
+                          correct_option: ans.questions?.correct_option || ""
+                        }} />
+
                       </div>
                     </details>
                   </div>
