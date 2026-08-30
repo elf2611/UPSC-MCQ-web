@@ -137,25 +137,24 @@ export async function generateExplanationGemini(payload: ExplainRequestPayload):
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const prompt = `
-You are an expert UPSC mentor. Provide a detailed explanation for this MCQ.
+You are an elite UPSC faculty member and mentor. Your goal is to explain the following Multiple Choice Question to a UPSC aspirant in a way that is highly detailed, extremely useful, professional, yet written in accessible, easy-to-understand language.
+
 Question: ${payload.question_text}
 A) ${payload.option_a}
 B) ${payload.option_b}
 C) ${payload.option_c}
 D) ${payload.option_d}
 
-Correct Answer is: ${payload.correct_option}
+The officially Correct Answer is: ${payload.correct_option}
 
 Return ONLY a JSON object with this exact structure:
 {
-  "correct_explanation": "Detailed reason why ${payload.correct_option} is correct",
+  "correct_explanation": "Explain exactly WHY this is the correct answer. Provide deep conceptual clarity, historical/factual context, and connect it to the UPSC syllabus. Use medium-simple vocabulary. Keep the tone encouraging and professional.",
   "why_others_wrong": {
-    "Option 1": "Why this is wrong",
-    "Option 2": "Why this is wrong",
-    "Option 3": "Why this is wrong"
+    "Option X": "Explicitly state why this option is factually or conceptually wrong. Explain the trap the examiner set."
   },
-  "elimination_technique": "How a student could have guessed this using elimination logic",
-  "memory_trick": "A short mnemonic or trick to remember this fact"
+  "elimination_technique": "Give the student a logical deduction, common-sense approach, or elimination strategy they could have used in the exam hall.",
+  "memory_trick": "Provide a highly effective mnemonic, visualization, or simple trick to remember this fact for the actual exam."
 }
 `;
 
