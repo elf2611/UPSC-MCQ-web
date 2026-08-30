@@ -32,7 +32,9 @@ export function AIExplanationButton({ questionData }: AIExplanationButtonProps) 
       }
 
       const data = await response.json();
-      setExplanation(data);
+      // Extremely robust check: if the API somehow returns an array (from old cache), grab the first item
+      const parsedData = Array.isArray(data) ? data[0] : data;
+      setExplanation(parsedData);
     } catch (err) {
       console.error(err);
       setError("Failed to load AI explanation. Please try again.");

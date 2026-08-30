@@ -28,7 +28,10 @@ export async function POST(req: Request) {
         const cached = await redis.get(cacheKey);
         if (cached) {
           console.log("[API] Returning cached explanation for:", cacheKey);
-          return NextResponse.json(cached);
+          // Handle corrupted array caches
+          const parsedCache = typeof cached === 'string' ? JSON.parse(cached) : cached;
+          const finalCache = Array.isArray(parsedCache) ? parsedCache[0] : parsedCache;
+          return NextResponse.json(finalCache);
         }
       } catch (redisError) {
         console.warn("[Redis] Cache read failed:", redisError);

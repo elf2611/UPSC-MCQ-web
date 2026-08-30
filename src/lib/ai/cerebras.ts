@@ -56,5 +56,6 @@ Return ONLY a JSON object with this exact structure:
   const data = await response.json();
   const rawText = data.choices?.[0]?.message?.content || "";
   const cleanText = sanitizeJSON(rawText);
-  return JSON.parse(cleanText) as DetailedExplanation;
+  const parsed = JSON.parse(cleanText);
+  return (Array.isArray(parsed) ? parsed[0] : parsed) as DetailedExplanation;
 }
