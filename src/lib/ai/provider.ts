@@ -27,7 +27,6 @@ export async function getDetailedExplanation(payload: ExplainRequestPayload): Pr
     console.log("[AI] Attempting to generate explanation with Gemini (Priority 1)...");
     return await generateExplanationGemini(payload);
   } catch (error: any) {
-    const isRateLimit = error?.message === "GEMINI_RATE_LIMIT" || String(error).includes("429");
     console.warn(`[AI] Gemini failed (${error.message}). Falling back to Cerebras (Priority 2)...`);
     
     try {
