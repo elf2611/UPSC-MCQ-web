@@ -2,14 +2,16 @@
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_questions_is_archived ON questions(is_archived);
 
--- Safe Cleanup: Hard delete questions that have NO references in attempt_answers, bookmarks, or revision_queue_items
+-- Safe Cleanup: Hard delete questions that have NO references in attempt_answers, bookmarks, revision_queue, or question_attempts
 DELETE FROM questions 
 WHERE id NOT IN (
     SELECT DISTINCT question_id FROM attempt_answers WHERE question_id IS NOT NULL
     UNION
     SELECT DISTINCT question_id FROM bookmarks WHERE question_id IS NOT NULL
     UNION
-    SELECT DISTINCT question_id FROM revision_queue_items WHERE question_id IS NOT NULL
+    SELECT DISTINCT question_id FROM revision_queue WHERE question_id IS NOT NULL
+    UNION
+    SELECT DISTINCT question_id FROM question_attempts WHERE question_id IS NOT NULL
 );
 
 -- Soft delete remaining questions to preserve historical analytics but hide from active practice
