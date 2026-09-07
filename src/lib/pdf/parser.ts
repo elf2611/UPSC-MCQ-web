@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdf = require('pdf-parse');
 
 export interface ParsedMCQ {
@@ -28,12 +29,12 @@ export interface ParsedConcept {
 }
 
 function render_page(pageData: any) {
-    let render_options = { normalizeWhitespace: false, disableCombineTextItems: false };
+    const render_options = { normalizeWhitespace: false, disableCombineTextItems: false };
     return pageData.getTextContent(render_options)
     .then(function(textContent: any) {
         let text = '';
         let lastY = -1;
-        for (let item of textContent.items) {
+        for (const item of textContent.items) {
             if (lastY == item.transform[5] || !lastY) {
                 text += item.str;
             } else {
@@ -54,7 +55,7 @@ export async function extractUPSCBookStructure(buffer: Buffer, sourceName: strin
 
   // 1. Initial cleanup: remove obvious repeated headers/footers (simplified)
   // For a robust system, we would find repeating patterns. Here we do basic trim.
-  let text = rawText.replace(/\r\n/g, '\n');
+  const text = rawText.replace(/\r\n/g, '\n');
 
   // We will store extracted entities
   const mcqs: ParsedMCQ[] = [];

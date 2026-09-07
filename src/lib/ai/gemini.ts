@@ -267,6 +267,6 @@ Output ONLY a raw JSON object with this exact schema. Do NOT wrap in markdown bl
 
   const data = await response.json();
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
   return JSON.parse(cleanText) as QuestionEvalResult;
 }

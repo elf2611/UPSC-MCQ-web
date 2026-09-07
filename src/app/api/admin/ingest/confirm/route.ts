@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: authRes.error }, { status: authRes.status });
     }
 
-    const { mcqs, concepts, document_hash, sourceName, subject, topic } = await req.json();
+    const { mcqs, document_hash, sourceName, subject, topic } = await req.json();
     
     // 2. Untrusted Payload Revalidation
     if (!document_hash || !sourceName) {
