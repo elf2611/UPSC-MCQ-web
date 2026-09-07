@@ -178,3 +178,88 @@ Return ONLY a JSON object with this exact structure:
   const parsed = JSON.parse(cleanText);
   return (Array.isArray(parsed) ? parsed[0] : parsed) as DetailedExplanation;
 }
+
+export async function generateEmbeddingsGemini(texts: string[]): Promise<number[][]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+  const modelName = "text-embedding-004";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:batchEmbedContents?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requests: texts.map(text => ({
+        model: `models/${modelName}`,
+        content: { parts: [{ text }] }
+      }))
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini Embedding Error: ${response.status} - ${errText}`);
+  }
+
+  const data = await response.json();
+  if (!data.embeddings || !Array.isArray(data.embeddings)) {
+    throw new Error("Invalid embedding response from Gemini");
+  }
+
+  return data.embeddings.map((emb: any) => emb.values);
+}
+
+export interface QuestionEvalResult {
+  passed: boolean;
+  factual_correctness: number;
+  ambiguity: number;
+  upsc_relevance: number;
+  single_correct_answer: boolean;
+  reason: string | null;
+}
+
+export async function evaluateQuestionGemini(question: any): Promise<QuestionEvalResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
+  const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+  const prompt = `
+You are an expert UPSC reviewer. Evaluate the following generated MCQ for quality.
+Question: ${question.question_text}
+A) ${question.option_a}
+B) ${question.option_b}
+C) ${question.option_c}
+D) ${question.option_d}
+Correct Answer: ${question.correct_option}
+Explanation: ${question.explanation}
+
+Output ONLY a raw JSON object with this exact schema. Do NOT wrap in markdown blocks like \`\`\`json.
+{
+  "passed": boolean (true if question is high quality, false if it has major issues),
+  "factual_correctness": number (0.0 to 1.0),
+  "ambiguity": number (0.0 to 1.0, 0.0 means completely unambiguous, 1.0 means highly ambiguous/confusing),
+  "upsc_relevance": number (0.0 to 1.0),
+  "single_correct_answer": boolean (true if exactly one option is clearly correct),
+  "reason": string | null (If passed is false, briefly explain why in 1 sentence. Null otherwise.)
+}
+`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini Eval Error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const cleanText = sanitizeJSON(rawText);
+  return JSON.parse(cleanText) as QuestionEvalResult;
+}

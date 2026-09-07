@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateQuestions } from "@/lib/ai/provider";
+import { evaluateQuestionGemini } from "@/lib/ai/gemini";
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,28 @@ export async function POST(req: NextRequest) {
 
     const questions = await generateQuestions({ text: body.text, config: body.config });
     
-    return NextResponse.json({ data: questions });
+    // Evaluate questions before accepting them
+    const validQuestions = [];
+    const rejectedQuestions = [];
+
+    for (const q of questions) {
+      try {
+        const evalResult = await evaluateQuestionGemini(q);
+        if (evalResult.passed && evalResult.factual_correctness >= 0.8 && evalResult.single_correct_answer) {
+          validQuestions.push({ ...q, eval_metrics: evalResult });
+        } else {
+          rejectedQuestions.push({ ...q, rejection_reason: evalResult.reason });
+        }
+      } catch (evalErr) {
+        console.warn("Failed to evaluate question, skipping:", evalErr);
+      }
+    }
+    
+    return NextResponse.json({ 
+      data: validQuestions, 
+      rejected_count: rejectedQuestions.length,
+      rejected: rejectedQuestions 
+    });
   } catch (error: unknown) {
     console.error("Generate API error:", error);
     return NextResponse.json({ error: (error as Error).message || "Failed to generate questions" }, { status: 500 });
