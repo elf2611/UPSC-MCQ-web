@@ -211,10 +211,12 @@ export async function generateEmbeddingsGemini(texts: string[]): Promise<number[
 
 export interface QuestionEvalResult {
   passed: boolean;
+  upsc_relevance: number;
+  difficulty: number;
   factual_correctness: number;
   ambiguity: number;
-  upsc_relevance: number;
   single_correct_answer: boolean;
+  distractor_quality: number;
   reason: string | null;
 }
 
@@ -225,7 +227,10 @@ export async function evaluateQuestionGemini(question: any): Promise<QuestionEva
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const prompt = `
-You are an expert UPSC reviewer. Evaluate the following generated MCQ for quality.
+You are an expert UPSC reviewer evaluating an AI-generated supplementary MCQ.
+Ensure it meets rigorous UPSC Prelims standards (assertion/reasoning, multi-statement, application-based).
+Generic trivia is strictly banned.
+
 Question: ${question.question_text}
 A) ${question.option_a}
 B) ${question.option_b}
@@ -236,11 +241,13 @@ Explanation: ${question.explanation}
 
 Output ONLY a raw JSON object with this exact schema. Do NOT wrap in markdown blocks like \`\`\`json.
 {
-  "passed": boolean (true if question is high quality, false if it has major issues),
+  "passed": boolean (true if question is high quality AND upsc_relevance >= 0.90, else false),
+  "upsc_relevance": number (0.0 to 1.0, must be high for analytical/statement questions, low for trivia),
+  "difficulty": number (0.0 to 1.0),
   "factual_correctness": number (0.0 to 1.0),
-  "ambiguity": number (0.0 to 1.0, 0.0 means completely unambiguous, 1.0 means highly ambiguous/confusing),
-  "upsc_relevance": number (0.0 to 1.0),
+  "ambiguity": number (0.0 to 1.0, 0.0 means completely unambiguous),
   "single_correct_answer": boolean (true if exactly one option is clearly correct),
+  "distractor_quality": number (0.0 to 1.0, are the wrong options plausible?),
   "reason": string | null (If passed is false, briefly explain why in 1 sentence. Null otherwise.)
 }
 `;
@@ -260,6 +267,6 @@ Output ONLY a raw JSON object with this exact schema. Do NOT wrap in markdown bl
 
   const data = await response.json();
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  const cleanText = sanitizeJSON(rawText);
+  let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
   return JSON.parse(cleanText) as QuestionEvalResult;
 }

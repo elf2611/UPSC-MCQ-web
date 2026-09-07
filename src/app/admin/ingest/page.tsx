@@ -128,7 +128,7 @@ export default function AdminIngestPage() {
           </div>
 
           <button type="submit" disabled={loading} className="px-6 py-2 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50">
-            {loading ? "Parsing PDF..." : "Extract & Preview"}
+            {loading ? "Parsing PDF..." : "Extract & Preview Source Questions"}
           </button>
         </form>
       )}
@@ -142,11 +142,11 @@ export default function AdminIngestPage() {
           )}
           
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Admin Preview: {parsedData.mcqs.length} MCQs Found</h2>
+            <h2 className="text-xl font-bold">Admin Preview: {parsedData.mcqs.length} Original Source MCQs Found</h2>
             <div className="space-x-4">
               <button onClick={() => setStep(1)} className="px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5">Cancel</button>
               <button onClick={handleConfirm} disabled={loading} className="px-6 py-2 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50">
-                {loading ? "Embedding & Importing..." : "Confirm & Import"}
+                {loading ? "Importing Original Questions..." : "Confirm & Import Source Questions"}
               </button>
             </div>
           </div>

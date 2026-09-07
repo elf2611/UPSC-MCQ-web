@@ -24,7 +24,8 @@ Configuration:
 - Explanation Length: ${explanationLength}
 
 Requirements for each question:
-1. Question text should be clear and conceptually rigorous, mimicking the UPSC standard.
+1. Question text MUST be conceptually rigorous, application-based, or use multi-statement/assertion-reasoning formats standard in UPSC Prelims.
+2. STRICTLY BANNED: Trivial definitions, generic one-liner facts, or simple school-level questions. Use the provided text to craft plausible distractors that require deep understanding to eliminate.
 2. Provide exactly 4 options (Option A, B, C, D).
 3. Specify the correct option (A, B, C, or D).
 4. Provide a ${explanationLength.toLowerCase()} explanation for why the correct answer is right.

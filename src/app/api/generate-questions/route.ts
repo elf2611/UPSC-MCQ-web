@@ -36,26 +36,42 @@ export async function POST(req: NextRequest) {
 
     const questions = await generateQuestions({ text: body.text, config: body.config });
     
-    // Evaluate questions before accepting them
     const validQuestions = [];
     const rejectedQuestions = [];
-
     for (const q of questions) {
+      if (!q.question_text || !q.option_a || !q.option_b || !q.option_c || !q.option_d || !q.correct_option) {
+        continue; // structural failure
+      }
+
+      // Step 2: AI Evaluation / Gatekeeper
       try {
         const evalResult = await evaluateQuestionGemini(q);
-        if (evalResult.passed && evalResult.factual_correctness >= 0.8 && evalResult.single_correct_answer) {
-          validQuestions.push({ ...q, eval_metrics: evalResult });
+        // Only accept if strictly passed and relevance/distractor quality is very high
+        if (
+          evalResult.passed &&
+          evalResult.upsc_relevance >= 0.90 &&
+          evalResult.factual_correctness >= 0.90 &&
+          evalResult.ambiguity <= 0.20 &&
+          evalResult.distractor_quality >= 0.80 &&
+          evalResult.single_correct_answer
+        ) {
+          validQuestions.push({
+            ...q,
+            source: 'ai_generated', // Strictly brand as AI
+            difficulty: 'medium', // Can map evalResult.difficulty to simple text if needed
+            eval_score: evalResult // Just for admin review, can be stripped before DB insert
+          });
         } else {
-          rejectedQuestions.push({ ...q, rejection_reason: evalResult.reason });
+          rejectedQuestions.push({ ...q, rejection_reason: evalResult.reason || 'Failed strict thresholds.' });
+          console.log(`[AI Eval Rejected]: ${evalResult.reason || 'Failed strict thresholds.'}`);
         }
       } catch (evalErr) {
-        console.warn("Failed to evaluate question, skipping:", evalErr);
+        console.error("Eval failed, rejecting question:", evalErr);
       }
     }
     
     return NextResponse.json({ 
       data: validQuestions, 
-      rejected_count: rejectedQuestions.length,
       rejected: rejectedQuestions 
     });
   } catch (error: unknown) {
