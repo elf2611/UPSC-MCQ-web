@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyUserToken } from "@/lib/auth-verify";
 import { buildMentorContext } from "@/lib/ai/context-builder";
 import { aiMentorTools, executeTool } from "@/lib/ai/tools";
-import { sanitizeJSON } from "@/lib/ai/gemini";
 
 const MAX_ITERATIONS = 3;
 

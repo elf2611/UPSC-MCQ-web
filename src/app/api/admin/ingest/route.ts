@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin, verifyUserToken, getUserTier } from "@/lib/auth-verify";
+import { getSupabaseAdmin, verifyUserToken } from "@/lib/auth-verify";
 import { generateEmbeddingsGemini } from "@/lib/ai/gemini";
 
 // Chunking utility

@@ -60,8 +60,8 @@ export default function MentorChat() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-muted-foreground mt-20">
-            <p>Hi! I'm your AI Mentor.</p>
-            <p className="text-sm mt-2">Try asking: "What are my weakest topics?"</p>
+            <p>Hi! I&apos;m your AI Mentor.</p>
+            <p className="text-sm mt-2">Try asking: &quot;What are my weakest topics?&quot;</p>
           </div>
         )}
         {messages.map((msg, i) => (
